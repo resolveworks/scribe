@@ -1,6 +1,8 @@
 <resources>
-    <!-- Compose-only app: minimal platform theme, real theming lives in Compose. -->
-    <style name="Theme.Amanuensis" parent="android:Theme.Material.NoActionBar" />
+    <!-- Compose-only app: minimal platform theme, real theming lives in Compose.
+         Light parent so the pre-Compose window (and status-bar icon appearance
+         under edge-to-edge) matches the system light mode. -->
+    <style name="Theme.Amanuensis" parent="android:Theme.Material.Light.NoActionBar" />
 
     <!-- IME window: the theme paints the keyboard surface background so the
          input-view root does not have to (avoids redundant overdraw). The

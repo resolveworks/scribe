@@ -1,27 +1,33 @@
 package com.amanuensis.ui.setup
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.amanuensis.R
 import com.amanuensis.ui.theme.AmanuensisTheme
 
+@OptIn(ExperimentalMaterial3Api::class) // TopAppBar is @ExperimentalMaterial3Api in stable 1.4.0; stable from 1.5.0-alpha23.
 @Composable
 fun SetupScreen(
     imeEnabled: Boolean,
@@ -30,63 +36,123 @@ fun SetupScreen(
     onRequestMicPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            // Edge-to-edge (target 37): stay clear of system bars...
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            // ...and stay usable on short/landscape displays.
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        // Centered when content fits; scrolls gracefully when it does not.
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = stringResource(R.string.setup_title),
-            style = MaterialTheme.typography.headlineMedium,
-        )
-
-        Text(
-            text = stringResource(R.string.setup_body),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Text(
-            text = stringResource(
-                R.string.setup_ime_status,
-                stringResource(if (imeEnabled) R.string.setup_status_yes else R.string.setup_status_no),
-            ),
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        Text(
-            text = stringResource(
-                R.string.setup_permission_status,
-                stringResource(if (micGranted) R.string.setup_status_yes else R.string.setup_status_no),
-            ),
-            style = MaterialTheme.typography.bodyLarge,
-        )
-
-        if (!imeEnabled) {
-            Button(onClick = onOpenImeSettings, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.setup_enable_ime))
-            }
-        }
-        if (!micGranted) {
-            Button(onClick = onRequestMicPermission, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.setup_grant_mic))
-            }
-        }
-
-        if (imeEnabled && micGranted) {
-            Text(
-                text = stringResource(R.string.setup_all_set),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = stringResource(R.string.setup_title),
+                        maxLines = 1,
+                    )
+                },
             )
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                // Scaffold supplies the edge-to-edge insets (target 37) and the
+                // top-bar height.
+                .padding(innerPadding)
+                // Stay usable on short/landscape displays.
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.setup_body),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+
+            SetupStep(
+                headline = stringResource(R.string.setup_enable_ime),
+                status = stringResource(
+                    R.string.setup_ime_status,
+                    stringResource(if (imeEnabled) R.string.setup_status_yes else R.string.setup_status_no),
+                ),
+                iconRes = R.drawable.ic_ime_keyboard,
+                done = imeEnabled,
+            )
+
+            SetupStep(
+                headline = stringResource(R.string.setup_grant_mic),
+                status = stringResource(
+                    R.string.setup_permission_status,
+                    stringResource(if (micGranted) R.string.setup_status_yes else R.string.setup_status_no),
+                ),
+                iconRes = R.drawable.ic_ime_mic,
+                done = micGranted,
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            if (!imeEnabled) {
+                Button(
+                    onClick = onOpenImeSettings,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                ) {
+                    Text(stringResource(R.string.setup_enable_ime))
+                }
+            }
+            if (!micGranted) {
+                Button(
+                    onClick = onRequestMicPermission,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                ) {
+                    Text(stringResource(R.string.setup_grant_mic))
+                }
+            }
+
+            if (imeEnabled && micGranted) {
+                Text(
+                    text = stringResource(R.string.setup_all_set),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun SetupStep(
+    headline: String,
+    status: String,
+    @DrawableRes iconRes: Int,
+    done: Boolean,
+) {
+    ListItem(
+        headlineContent = { Text(headline) },
+        supportingContent = { Text(status) },
+        leadingContent = {
+            Icon(
+                painter = painterResource(iconRes),
+                // Decorative: the row text carries the meaning.
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        trailingContent = if (done) {
+            {
+                Icon(
+                    painter = painterResource(R.drawable.ic_check),
+                    // Status is already stated by the supporting text.
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        } else {
+            null
+        },
+    )
 }
 
 @Preview(showBackground = true)
@@ -96,6 +162,19 @@ private fun SetupScreenPreview() {
         SetupScreen(
             imeEnabled = false,
             micGranted = false,
+            onOpenImeSettings = {},
+            onRequestMicPermission = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SetupScreenAllSetPreview() {
+    AmanuensisTheme {
+        SetupScreen(
+            imeEnabled = true,
+            micGranted = true,
             onOpenImeSettings = {},
             onRequestMicPermission = {},
         )

@@ -1,0 +1,4 @@
+<resources>
+    <!-- Dark counterpart of Theme.Amanuensis for night mode. -->
+    <style name="Theme.Amanuensis" parent="android:Theme.Material.NoActionBar" />
+</resources>
