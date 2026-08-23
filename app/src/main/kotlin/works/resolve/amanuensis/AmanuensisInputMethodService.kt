@@ -68,12 +68,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
     /** Separator computed for the line currently being dictated, until committed. */
     private var pendingSeparator: String? = null
 
-    /** Committed text of the current session, shown in the preview. */
-    private val sessionText = StringBuilder()
-
-    /** Current partial (uncommitted) text of the session, shown in the preview. */
-    private var partialText: String = ""
-
     /** Monotonic id of the latest load/start request; see [startDictation]. */
     @Volatile private var requestGeneration = 0
 
@@ -178,15 +172,12 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         // A trailing final from a normal stop may still be in flight for the
         // editor we were just dictating into; only if a *different* editor is
         // now focused do we wipe the session, so an old editor's transcript
-        // is never displayed or committed into the new field.
+        // is never committed into the new field.
         val sameEditor = sessionConnection !== null && sessionConnection === currentInputConnection
         stopDictation()
         if (!sameEditor) {
             sessionConnection = null
             pendingSeparator = null
-            sessionText.setLength(0)
-            partialText = ""
-            setPreview("")
         }
         applyFieldKind()
         refreshMicButton()
@@ -231,16 +222,11 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                     setStatus(getString(R.string.ime_status_loading))
                 else -> when (engineState) {
                     EngineState.LOADING, EngineState.STOPPING -> setStatus(getString(R.string.ime_status_loading))
-                    EngineState.LISTENING -> setStatus(getString(R.string.ime_status_listening))
                     EngineState.FAILED -> setStatus(getString(R.string.ime_status_failed))
-                    else -> setStatus(getString(R.string.ime_status_idle))
+                    // IDLE, READY, LISTENING: the mic button already shows it.
+                    else -> setStatus("")
                 }
             }
-        }
-        if (fieldKind != EditorPolicy.FieldKind.DICTATABLE) {
-            setPreview("")
-        } else {
-            setPreview(sessionText.toString() + (pendingSeparator ?: "") + partialText)
         }
     }
 
@@ -340,9 +326,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         val ic = currentInputConnection ?: return
         sessionConnection = ic
         pendingSeparator = null
-        sessionText.setLength(0)
-        partialText = ""
-        setPreview("")
         engineState = EngineState.LOADING
         val generation = ++requestGeneration
         setStatus(getString(R.string.ime_status_loading))
@@ -390,7 +373,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                     generation == requestGeneration
                 ) {
                     engineState = EngineState.LISTENING
-                    setStatus(getString(R.string.ime_status_listening))
+                    setStatus("")
                     refreshMicButton()
                 }
                 // Otherwise the IME was hidden or the session stopped while
@@ -405,7 +388,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         when (engineState) {
             EngineState.LISTENING -> {
                 engineState = EngineState.READY
-                setStatus(getString(R.string.ime_status_idle))
+                setStatus("")
                 refreshMicButton()
                 // Non-blocking; Moonshine flushes the trailing line, which
                 // arrives as a final onLine callback while the connection
@@ -433,7 +416,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                     main.post {
                         if (!destroyed && engineState == EngineState.STOPPING) {
                             engineState = EngineState.READY
-                            setStatus(getString(R.string.ime_status_idle))
                             refreshMicButton()
                             applyFieldKind()
                         }
@@ -448,11 +430,9 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         if (destroyed || engineState != EngineState.LISTENING) return
         val ic = sessionConnection ?: return
         if (currentInputConnection !== ic) return
-        // Sensitive fields must never preview or receive dictated content.
+        // Sensitive fields must never receive dictated content.
         if (fieldKind != EditorPolicy.FieldKind.DICTATABLE) return
-        partialText = text
         ic.setComposingText(separatorFor(ic) + text, 1)
-        setPreview(sessionText.toString() + (pendingSeparator ?: "") + text)
     }
 
     private fun onFinalLine(line: TranscriptLine) {
@@ -463,13 +443,10 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         if (text.isNotEmpty()) {
             // Replaces the composing (partial) region and commits the final line.
             ic.commitText(separatorFor(ic) + text, 1)
-            sessionText.append(pendingSeparator ?: "").append(text)
         } else {
             ic.finishComposingText()
         }
-        partialText = ""
         pendingSeparator = null
-        setPreview(sessionText.toString())
     }
 
     private fun separatorFor(ic: InputConnection): String {
@@ -522,10 +499,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
 
     private fun setStatus(text: String) {
         uiState = uiState.copy(status = text)
-    }
-
-    private fun setPreview(text: String) {
-        uiState = uiState.copy(preview = text)
     }
 
     private fun refreshMicButton() {

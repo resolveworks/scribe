@@ -16,7 +16,7 @@ object EditorPolicy {
     /**
      * Classifies an `EditorInfo.inputType`. Password-style text fields (plain,
      * visible, and web variations) and numeric password fields are sensitive:
-     * dictation is disabled and nothing is ever previewed. `TYPE_NULL` means
+     * dictation is disabled for them. `TYPE_NULL` means
      * the editor did not declare an input type, so we cannot trust it.
      */
     fun classify(inputType: Int): FieldKind {

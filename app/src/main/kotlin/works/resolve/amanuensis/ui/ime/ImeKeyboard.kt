@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,10 +30,10 @@ import works.resolve.amanuensis.ui.theme.AmanuensisTheme
 
 internal enum class MicVisualState { IDLE, LOADING, LISTENING, FAILED }
 
+/** One-line hint; rendered only while non-blank. */
 @Immutable
 internal data class ImeUiState(
     val status: String = "",
-    val preview: String = "",
     val micState: MicVisualState = MicVisualState.IDLE,
     val micEnabled: Boolean = false,
 )
@@ -52,30 +51,20 @@ internal fun ImeKeyboard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(192.dp)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
-            Text(
-                text = state.status,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = state.preview,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(top = 8.dp)
-                    // The focused editor already exposes composing text. Do not
-                    // make a second transcript copy available to accessibility.
-                    .clearAndSetSemantics { },
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (state.status.isNotBlank()) {
+                Text(
+                    text = state.status,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -169,9 +158,8 @@ private fun ImeKeyboardPreview() {
     AmanuensisTheme {
         ImeKeyboard(
             state = ImeUiState(
-                status = "Listening…",
-                preview = "A changing partial transcript appears here",
-                micState = MicVisualState.LISTENING,
+                status = "Something went wrong. Tap to retry.",
+                micState = MicVisualState.FAILED,
                 micEnabled = true,
             ),
             onDelete = {},
