@@ -49,7 +49,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // On-device speech recognition (used by the IME, added in a later slice)
+    // On-device speech recognition (MicTranscriber, used by the IME)
     implementation(libs.moonshine.voice)
 
     // Unit tests

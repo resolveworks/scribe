@@ -1,4 +1,11 @@
 <resources>
     <!-- Compose-only app: minimal platform theme, real theming lives in Compose. -->
     <style name="Theme.Amanuensis" parent="android:Theme.Material.NoActionBar" />
+
+    <!-- IME window: the theme paints the keyboard surface background so the
+         input-view root does not have to (avoids redundant overdraw). The
+         color resolves per configuration (light/night). -->
+    <style name="Theme.Amanuensis.Ime">
+        <item name="android:windowBackground">@color/ime_background</item>
+    </style>
 </resources>
