@@ -10,7 +10,7 @@ android {
     buildToolsVersion = "37.0.0"
 
     defaultConfig {
-        applicationId = "com.amanuensis"
+        applicationId = "works.resolve.amanuensis"
         minSdk = 37
         targetSdk = 37
         versionCode = 1
