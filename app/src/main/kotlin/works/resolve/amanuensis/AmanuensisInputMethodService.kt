@@ -217,13 +217,10 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                     setStatus(getString(R.string.ime_status_model_missing))
                 !micPermissionGranted() ->
                     setStatus(getString(R.string.ime_status_permission_missing))
-                modelPresent == null ->
-                    // First model-cache check still running.
-                    setStatus(getString(R.string.ime_status_loading))
                 else -> when (engineState) {
-                    EngineState.LOADING, EngineState.STOPPING -> setStatus(getString(R.string.ime_status_loading))
                     EngineState.FAILED -> setStatus(getString(R.string.ime_status_failed))
-                    // IDLE, READY, LISTENING: the mic button already shows it.
+                    // LOADING/STOPPING and the initial model-cache check show
+                    // no status line; the mic button's loader covers loading.
                     else -> setStatus("")
                 }
             }
@@ -328,7 +325,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         pendingSeparator = null
         engineState = EngineState.LOADING
         val generation = ++requestGeneration
-        setStatus(getString(R.string.ime_status_loading))
+        setStatus("") // Any previous status line is cleared; the loader shows loading.
         refreshMicButton()
         // load() downloads the model on first use and start() may block on a
         // permission prompt; both stay off the main thread on the single
@@ -409,7 +406,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                 requestGeneration++ // Invalidate the in-flight load/start request.
                 sessionConnection = null
                 pendingSeparator = null
-                setStatus(getString(R.string.ime_status_loading))
+                setStatus("")
                 refreshMicButton()
                 worker.execute {
                     mic?.stop()

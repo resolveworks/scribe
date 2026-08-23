@@ -26,7 +26,6 @@
     <string name="ime_key_enter">⏎</string>
     <string name="ime_status_model_missing">Finish setup to download the speech model</string>
     <string name="ime_status_permission_missing">Finish setup to allow the microphone</string>
-    <string name="ime_status_loading">Preparing…</string>
     <string name="ime_status_failed">Something went wrong. Tap to retry.</string>
     <string name="ime_status_sensitive">Voice dictation is off for passwords</string>
     <string name="ime_status_unsupported">This field does not accept dictated text</string>

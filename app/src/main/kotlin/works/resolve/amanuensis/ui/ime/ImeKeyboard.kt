@@ -1,9 +1,10 @@
 package works.resolve.amanuensis.ui.ime
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,17 +49,25 @@ internal fun ImeKeyboard(
     modifier: Modifier = Modifier,
 ) {
     Surface(modifier = modifier.fillMaxWidth()) {
-        Column(
+        // The IME window's height wraps this view's measured height, so it
+        // must be deterministic: a fixed-height content area whose status
+        // band is always reserved (a status line appearing and disappearing
+        // must never resize the keyboard) and whose control row is centered
+        // regardless of state. navigationBarsPadding comes first so the
+        // fixed height lands fully above the edge-to-edge nav bar.
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp)
+                .height(112.dp), // 24dp status band + 64dp controls + 24dp
         ) {
             if (state.status.isNotBlank()) {
                 Text(
                     text = state.status,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp),
+                        .align(Alignment.TopStart),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
@@ -66,7 +75,9 @@ internal fun ImeKeyboard(
                 )
             }
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.Center),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 KeyboardKey(
