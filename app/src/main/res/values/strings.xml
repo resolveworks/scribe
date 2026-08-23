@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Amanuensis</string>
+    <string name="ime_name">Amanuensis</string>
+
+    <string name="setup_title">Welcome to Amanuensis</string>
+    <string name="setup_body">Amanuensis is an on-device voice keyboard. Everything runs locally on this device — your speech never leaves it. The speech recognition model is downloaded once on first use, and works offline afterwards.</string>
+    <string name="setup_ime_status">Keyboard enabled: %1$s</string>
+    <string name="setup_permission_status">Microphone permission: %1$s</string>
+    <string name="setup_status_yes">yes</string>
+    <string name="setup_status_no">no</string>
+    <string name="setup_enable_ime">Enable in system settings</string>
+    <string name="setup_open_picker">Select keyboard</string>
+    <string name="setup_grant_mic">Grant microphone access</string>
+    <string name="setup_all_set">All set — you can switch to Amanuensis from any text field.</string>
+</resources>
