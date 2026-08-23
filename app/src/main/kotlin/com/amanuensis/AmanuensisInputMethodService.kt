@@ -1,5 +1,6 @@
 package com.amanuensis
 
+import android.content.Intent
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
@@ -59,6 +60,17 @@ class AmanuensisInputMethodService : InputMethodService() {
 
     /** Monotonic id of the latest load/start request; see [startDictation]. */
     @Volatile private var requestGeneration = 0
+
+    /**
+     * Whether the Moonshine model is cached. Null until the first (async)
+     * cache check completes. True is sticky for the process lifetime; false
+     * re-checks on every input start, so a model downloaded in setup later
+     * in this same process is picked up.
+     */
+    @Volatile private var modelPresent: Boolean? = null
+
+    /** Guards against repeatedly pushing the setup screen over the host app. */
+    private var setupPromptShown = false
 
     private var fieldKind = EditorPolicy.FieldKind.DICTATABLE
 
@@ -128,6 +140,11 @@ class AmanuensisInputMethodService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         fieldKind = EditorPolicy.classify(info?.inputType ?: 0)
+        if (modelPresent != true) {
+            // The model may have been downloaded in setup since the last look;
+            // re-check the cache off the main thread.
+            checkModel(launchSetupIfMissing = !restarting)
+        }
         // A trailing final from a normal stop may still be in flight for the
         // editor we were just dictating into; only if a *different* editor is
         // now focused do we wipe the session, so an old editor's transcript
@@ -163,11 +180,18 @@ class AmanuensisInputMethodService : InputMethodService() {
                 setStatus(getString(R.string.ime_status_sensitive))
             EditorPolicy.FieldKind.UNSUPPORTED ->
                 setStatus(getString(R.string.ime_status_unsupported))
-            EditorPolicy.FieldKind.DICTATABLE -> when (engineState) {
-                EngineState.LOADING, EngineState.STOPPING -> setStatus(getString(R.string.ime_status_loading))
-                EngineState.LISTENING -> setStatus(getString(R.string.ime_status_listening))
-                EngineState.FAILED -> setStatus(getString(R.string.ime_status_failed))
-                else -> setStatus(getString(R.string.ime_status_idle))
+            EditorPolicy.FieldKind.DICTATABLE -> when {
+                modelPresent == false ->
+                    setStatus(getString(R.string.ime_status_model_missing))
+                modelPresent == null ->
+                    // First model-cache check still running.
+                    setStatus(getString(R.string.ime_status_loading))
+                else -> when (engineState) {
+                    EngineState.LOADING, EngineState.STOPPING -> setStatus(getString(R.string.ime_status_loading))
+                    EngineState.LISTENING -> setStatus(getString(R.string.ime_status_listening))
+                    EngineState.FAILED -> setStatus(getString(R.string.ime_status_failed))
+                    else -> setStatus(getString(R.string.ime_status_idle))
+                }
             }
         }
         if (fieldKind != EditorPolicy.FieldKind.DICTATABLE) {
@@ -184,14 +208,41 @@ class AmanuensisInputMethodService : InputMethodService() {
             engineState != EngineState.LOADING &&
             engineState != EngineState.STOPPING
 
+    // -- Model cache --------------------------------------------------------
+
+    private fun checkModel(launchSetupIfMissing: Boolean) {
+        worker.execute {
+            val present = MoonshineModel.isDownloaded(this)
+            main.post {
+                if (destroyed) return@post
+                modelPresent = present
+                if (!present && launchSetupIfMissing && !setupPromptShown) {
+                    setupPromptShown = true
+                    openSetupScreen()
+                }
+                applyFieldKind()
+                refreshMicButton()
+            }
+        }
+    }
+
+    private fun openSetupScreen() {
+        // The model is downloaded here during setup; bring it forward at the
+        // point of use, the same way the system mic-permission prompt appears.
+        startActivity(
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
+
     // -- Dictation -----------------------------------------------------------
 
     private fun onMicClicked() {
-        if (!micEnabled()) return
-        if (engineState == EngineState.LISTENING) {
-            stopDictation()
-        } else {
-            startDictation()
+        when {
+            modelPresent == false -> openSetupScreen()
+            modelPresent == null -> Unit // Model-cache check still running.
+            !micEnabled() -> return
+            engineState == EngineState.LISTENING -> stopDictation()
+            else -> startDictation()
         }
     }
 

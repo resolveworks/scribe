@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -27,13 +28,19 @@ import androidx.compose.ui.unit.dp
 import com.amanuensis.R
 import com.amanuensis.ui.theme.AmanuensisTheme
 
+/** Setup state of the speech-model download, driven by [MainActivity]. */
+enum class ModelState { NOT_DOWNLOADED, DOWNLOADING, DOWNLOADED, FAILED }
+
 @OptIn(ExperimentalMaterial3Api::class) // TopAppBar is @ExperimentalMaterial3Api in stable 1.4.0; stable from 1.5.0-alpha23.
 @Composable
 fun SetupScreen(
     imeEnabled: Boolean,
     micGranted: Boolean,
+    modelState: ModelState,
+    downloadProgress: Float?,
     onOpenImeSettings: () -> Unit,
     onRequestMicPermission: () -> Unit,
+    onDownloadModel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -87,6 +94,24 @@ fun SetupScreen(
                 done = micGranted,
             )
 
+            SetupStep(
+                headline = stringResource(R.string.setup_download_model),
+                status = when (modelState) {
+                    ModelState.DOWNLOADED -> stringResource(
+                        R.string.setup_model_status,
+                        stringResource(R.string.setup_status_yes),
+                    )
+                    ModelState.DOWNLOADING -> stringResource(R.string.setup_model_downloading)
+                    ModelState.FAILED -> stringResource(R.string.setup_download_failed)
+                    ModelState.NOT_DOWNLOADED -> stringResource(
+                        R.string.setup_model_status,
+                        stringResource(R.string.setup_status_no),
+                    )
+                },
+                iconRes = R.drawable.ic_download,
+                done = modelState == ModelState.DOWNLOADED,
+            )
+
             Spacer(Modifier.height(8.dp))
 
             if (!imeEnabled) {
@@ -107,6 +132,32 @@ fun SetupScreen(
                         .padding(horizontal = 16.dp),
                 ) {
                     Text(stringResource(R.string.setup_grant_mic))
+                }
+            }
+            if (modelState == ModelState.DOWNLOADING) {
+                val progress = downloadProgress
+                if (progress != null) {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                    )
+                } else {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                    )
+                }
+            } else if (modelState != ModelState.DOWNLOADED) {
+                Button(
+                    onClick = onDownloadModel,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                ) {
+                    Text(stringResource(R.string.setup_download_model))
                 }
             }
         }
@@ -153,8 +204,27 @@ private fun SetupScreenPreview() {
         SetupScreen(
             imeEnabled = false,
             micGranted = false,
+            modelState = ModelState.NOT_DOWNLOADED,
+            downloadProgress = null,
             onOpenImeSettings = {},
             onRequestMicPermission = {},
+            onDownloadModel = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SetupScreenDownloadingPreview() {
+    AmanuensisTheme {
+        SetupScreen(
+            imeEnabled = true,
+            micGranted = true,
+            modelState = ModelState.DOWNLOADING,
+            downloadProgress = 0.4f,
+            onOpenImeSettings = {},
+            onRequestMicPermission = {},
+            onDownloadModel = {},
         )
     }
 }
@@ -166,8 +236,11 @@ private fun SetupScreenAllSetPreview() {
         SetupScreen(
             imeEnabled = true,
             micGranted = true,
+            modelState = ModelState.DOWNLOADED,
+            downloadProgress = null,
             onOpenImeSettings = {},
             onRequestMicPermission = {},
+            onDownloadModel = {},
         )
     }
 }

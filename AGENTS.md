@@ -7,9 +7,9 @@ is an MVP on purpose; see the hard rules before adding scope.
 
 - A voice-input IME: tap the mic, speak, text lands in the focused field as
   partial (`onText` → composing) and final (`onLine` → committed) segments.
-- A minimal Compose setup activity guiding the user through enabling the IME
-  and granting the microphone permission (default Material 3 look, dynamic
-  system colors; no custom styling).
+- A minimal Compose setup activity guiding the user through enabling the IME,
+  granting the microphone permission, and downloading the speech model
+  (default Material 3 look, dynamic system colors; no custom styling).
 - English (en-US) only, on-device recognition only.
 
 Out of scope for the MVP: settings screens, other languages, non-voice
@@ -24,6 +24,10 @@ keyboards, transcript history, cloud services.
     request-generation guard for stop-vs-start races.
   - `MainActivity.kt` + `ui/setup/SetupScreen.kt` + `ui/theme/` — the Compose
     setup flow.
+  - `MoonshineModel.kt` — shared model-cache helper: setup checks/downloads
+    the model here; the IME checks presence without a blocking `load()`. The
+    spec must mirror `MicTranscriber`'s defaults so both hit the same cache
+    directory.
   - `ime/ImePolicies.kt` — pure, unit-tested policy helpers (field
     classification incl. passwords, separator logic, enter-key decision).
     Keep new logic pure here, not in the service.

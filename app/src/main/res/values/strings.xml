@@ -10,6 +10,10 @@
     <string name="setup_status_no">no</string>
     <string name="setup_enable_ime">Enable keyboard</string>
     <string name="setup_grant_mic">Allow microphone</string>
+    <string name="setup_download_model">Download speech model</string>
+    <string name="setup_model_status">Model downloaded: %1$s</string>
+    <string name="setup_model_downloading">Downloading…</string>
+    <string name="setup_download_failed">Download failed. Try again.</string>
 
     <string name="ime_subtype_voice_en">English (voice)</string>
     <string name="ime_cd_mic_start">Start voice dictation</string>
@@ -19,6 +23,7 @@
     <string name="ime_cd_enter">Enter</string>
     <string name="ime_cd_switch">Switch keyboard</string>
     <string name="ime_status_idle">Tap the microphone to dictate</string>
+    <string name="ime_status_model_missing">Finish setup to download the speech model</string>
     <string name="ime_status_loading">Preparing…</string>
     <string name="ime_status_downloading">Downloading model… %1$d%%</string>
     <string name="ime_status_listening">Listening…</string>
