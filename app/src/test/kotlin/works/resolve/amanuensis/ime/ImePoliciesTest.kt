@@ -1,9 +1,9 @@
-package com.amanuensis.ime
+package works.resolve.amanuensis.ime
 
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
-import com.amanuensis.ime.EditorActions.Decision
-import com.amanuensis.ime.EditorPolicy.FieldKind
+import works.resolve.amanuensis.ime.EditorActions.Decision
+import works.resolve.amanuensis.ime.EditorPolicy.FieldKind
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

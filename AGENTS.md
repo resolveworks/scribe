@@ -17,7 +17,7 @@ keyboards, transcript history, cloud services.
 
 ## Architecture / layout
 
-- `app/src/main/kotlin/com/amanuensis/`
+- `app/src/main/kotlin/works/resolve/amanuensis/`
   - `AmanuensisInputMethodService.kt` — the whole IME: plain-XML input view,
     engine state machine (IDLE/LOADING/STOPPING/READY/LISTENING/FAILED), a
     single serialized background executor for blocking Moonshine calls, and a

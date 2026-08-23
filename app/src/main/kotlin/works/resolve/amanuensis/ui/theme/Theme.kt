@@ -1,4 +1,4 @@
-package com.amanuensis.ui.theme
+package works.resolve.amanuensis.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme

@@ -1,4 +1,4 @@
-package com.amanuensis.ui.setup
+package works.resolve.amanuensis.ui.setup
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
@@ -25,8 +25,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.amanuensis.R
-import com.amanuensis.ui.theme.AmanuensisTheme
+import works.resolve.amanuensis.R
+import works.resolve.amanuensis.ui.theme.AmanuensisTheme
 
 /** Setup state of the speech-model download, driven by [MainActivity]. */
 enum class ModelState { NOT_DOWNLOADED, DOWNLOADING, DOWNLOADED, FAILED }

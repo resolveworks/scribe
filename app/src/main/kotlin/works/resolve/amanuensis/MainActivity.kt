@@ -1,4 +1,4 @@
-package com.amanuensis
+package works.resolve.amanuensis
 
 import android.Manifest
 import android.content.Context
@@ -13,9 +13,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.amanuensis.ui.setup.ModelState
-import com.amanuensis.ui.setup.SetupScreen
-import com.amanuensis.ui.theme.AmanuensisTheme
+import works.resolve.amanuensis.ui.setup.ModelState
+import works.resolve.amanuensis.ui.setup.SetupScreen
+import works.resolve.amanuensis.ui.theme.AmanuensisTheme
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 

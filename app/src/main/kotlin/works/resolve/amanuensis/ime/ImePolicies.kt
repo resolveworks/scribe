@@ -1,4 +1,4 @@
-package com.amanuensis.ime
+package works.resolve.amanuensis.ime
 
 import android.text.InputType
 import android.view.inputmethod.EditorInfo

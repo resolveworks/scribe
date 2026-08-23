@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.amanuensis"
+    namespace = "works.resolve.amanuensis"
     compileSdk = 37
     buildToolsVersion = "37.0.0"
 

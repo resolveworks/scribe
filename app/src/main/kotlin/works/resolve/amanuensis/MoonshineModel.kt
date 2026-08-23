@@ -1,4 +1,4 @@
-package com.amanuensis
+package works.resolve.amanuensis
 
 import ai.moonshine.voice.AssetDownloader
 import ai.moonshine.voice.JNI

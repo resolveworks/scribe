@@ -1,4 +1,4 @@
-package com.amanuensis
+package works.resolve.amanuensis
 
 import android.content.Intent
 import android.inputmethodservice.InputMethodService
@@ -12,9 +12,9 @@ import android.widget.ImageButton
 import android.widget.TextView
 import ai.moonshine.voice.MicTranscriber
 import ai.moonshine.voice.TranscriptLine
-import com.amanuensis.ime.EditorActions
-import com.amanuensis.ime.EditorPolicy
-import com.amanuensis.ime.TextJoining
+import works.resolve.amanuensis.ime.EditorActions
+import works.resolve.amanuensis.ime.EditorPolicy
+import works.resolve.amanuensis.ime.TextJoining
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
