@@ -109,15 +109,6 @@ fun SetupScreen(
                     Text(stringResource(R.string.setup_grant_mic))
                 }
             }
-
-            if (imeEnabled && micGranted) {
-                Text(
-                    text = stringResource(R.string.setup_all_set),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-            }
         }
     }
 }
