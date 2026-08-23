@@ -19,9 +19,9 @@ keyboards, transcript history, cloud services.
 
 - `app/src/main/kotlin/works/resolve/amanuensis/`
   - `AmanuensisInputMethodService.kt` — the IME host and engine state machine
-    (IDLE/LOADING/STOPPING/READY/LISTENING/FAILED), with a single serialized
-    background executor for blocking Moonshine calls and a request-generation
-    guard for stop-vs-start races. It supplies the lifecycle owners required
+    (IDLE/LOADING/STOPPING/LISTENING/FAILED), with a single serialized
+    background executor for blocking Moonshine calls and a STOPPING barrier
+    for stop-vs-start races. It supplies the lifecycle owners required
     by the Compose input view.
   - `MainActivity.kt` + `ui/setup/SetupScreen.kt` + `ui/ime/ImeKeyboard.kt` +
     `ui/theme/` — the Compose setup flow and minimal Material 3 IME UI.
@@ -30,7 +30,7 @@ keyboards, transcript history, cloud services.
     spec must mirror `MicTranscriber`'s defaults so both hit the same cache
     directory.
   - `ime/ImePolicies.kt` — pure, unit-tested policy helpers (separator
-    logic, enter-key decision, auto-start decision). Keep new logic pure
+    logic and enter-key decision). Keep new logic pure
     here, not in the service.
 - `app/src/main/res/` — icons and `xml/input_method.xml` (single en-US voice
   subtype).
