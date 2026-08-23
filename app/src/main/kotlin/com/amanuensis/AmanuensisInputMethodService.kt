@@ -8,7 +8,6 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
-import android.view.inputmethod.InputMethodManager
 import android.widget.ImageButton
 import android.widget.TextView
 import ai.moonshine.voice.MicTranscriber
@@ -117,18 +116,8 @@ class AmanuensisInputMethodService : InputMethodService() {
         statusView = view.findViewById(R.id.ime_status)
         previewView = view.findViewById(R.id.ime_preview)
         micButton = view.findViewById<ImageButton>(R.id.ime_mic).also { it.setOnClickListener { onMicClicked() } }
-        view.findViewById<ImageButton>(R.id.ime_delete).also { button ->
-            button.imageTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.ime_text_primary))
-            button.setOnClickListener { deleteBackwards() }
-        }
-        view.findViewById<ImageButton>(R.id.ime_enter).also { button ->
-            button.imageTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.ime_text_primary))
-            button.setOnClickListener { performEnter() }
-        }
-        view.findViewById<ImageButton>(R.id.ime_switch).also { button ->
-            button.imageTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.ime_text_primary))
-            button.setOnClickListener { switchToNextKeyboard() }
-        }
+        view.findViewById<TextView>(R.id.ime_delete).setOnClickListener { deleteBackwards() }
+        view.findViewById<TextView>(R.id.ime_enter).setOnClickListener { performEnter() }
         applyFieldKind()
         refreshMicButton()
         return view
@@ -425,14 +414,6 @@ class AmanuensisInputMethodService : InputMethodService() {
                 ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
                 ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
             }
-        }
-    }
-
-    private fun switchToNextKeyboard() {
-        // Never leave a microphone recording behind in the next keyboard.
-        stopDictation()
-        if (!switchToNextInputMethod(false)) {
-            getSystemService(InputMethodManager::class.java)?.showInputMethodPicker()
         }
     }
 

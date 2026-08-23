@@ -21,7 +21,8 @@
     <string name="ime_cd_mic_retry">Retry starting voice dictation</string>
     <string name="ime_cd_delete">Delete</string>
     <string name="ime_cd_enter">Enter</string>
-    <string name="ime_cd_switch">Switch keyboard</string>
+    <string name="ime_key_delete">⌫</string>
+    <string name="ime_key_enter">⏎</string>
     <string name="ime_status_idle">Tap the microphone to dictate</string>
     <string name="ime_status_model_missing">Finish setup to download the speech model</string>
     <string name="ime_status_loading">Preparing…</string>

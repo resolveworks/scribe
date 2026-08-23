@@ -44,14 +44,15 @@
             android:layout_weight="1"
             android:orientation="horizontal">
 
-            <ImageButton
+            <TextView
                 android:id="@+id/ime_delete"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="@drawable/ime_key_bg"
-                android:src="@drawable/ic_ime_backspace"
-                android:scaleType="centerInside"
-                android:padding="12dp"
+                android:text="@string/ime_key_delete"
+                android:textSize="22sp"
+                android:textColor="@color/ime_text_primary"
+                android:gravity="center"
                 android:contentDescription="@string/ime_cd_delete" />
         </LinearLayout>
 
@@ -79,26 +80,16 @@
             android:orientation="horizontal"
             android:gravity="end">
 
-            <ImageButton
+            <TextView
                 android:id="@+id/ime_enter"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="@drawable/ime_key_bg"
-                android:src="@drawable/ic_ime_enter"
-                android:scaleType="centerInside"
-                android:padding="12dp"
+                android:text="@string/ime_key_enter"
+                android:textSize="22sp"
+                android:textColor="@color/ime_text_primary"
+                android:gravity="center"
                 android:contentDescription="@string/ime_cd_enter" />
-
-            <ImageButton
-                android:id="@+id/ime_switch"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="4dp"
-                android:background="@drawable/ime_key_bg"
-                android:src="@drawable/ic_ime_keyboard"
-                android:scaleType="centerInside"
-                android:padding="12dp"
-                android:contentDescription="@string/ime_cd_switch" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>
