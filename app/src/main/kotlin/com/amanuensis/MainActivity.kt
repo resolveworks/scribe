@@ -1,8 +1,8 @@
 package com.amanuensis
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
@@ -13,7 +13,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.content.ContextCompat
 import com.amanuensis.ui.setup.SetupScreen
 import com.amanuensis.ui.theme.AmanuensisTheme
 
@@ -50,21 +49,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openImeSettings() {
-        startActivity(
-            android.content.Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)
-                .addFlags(
-                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
-                        android.content.Intent.FLAG_ACTIVITY_NO_HISTORY or
-                        android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS,
-                ),
-        )
+        startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
     }
 
     private fun showInputMethodPicker() {
-        val imm = getSystemService(Activity.INPUT_METHOD_SERVICE) as InputMethodManager
+        val imm = getSystemService(InputMethodManager::class.java)
         // Conventional, safe way to show the system picker; a no-op on the
         // rare devices where it is not supported.
-        runCatching { imm.showInputMethodPicker() }
+        runCatching { imm?.showInputMethodPicker() }
     }
 
     private fun requestMicPermission() {
@@ -77,18 +69,13 @@ class MainActivity : ComponentActivity() {
         }
 
     companion object {
-        fun isImeEnabled(context: Context): Boolean = isPackageImeEnabled(
-            Settings.Secure.getString(
-                context.contentResolver,
-                Settings.Secure.ENABLED_INPUT_METHODS,
-            ),
-            context.packageName,
-        )
+        fun isImeEnabled(context: Context): Boolean =
+            context.getSystemService(InputMethodManager::class.java)
+                ?.enabledInputMethodList
+                ?.any { it.packageName == context.packageName } == true
 
         fun isMicGranted(context: Context): Boolean =
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.RECORD_AUDIO,
-            ) == PackageManager.PERMISSION_GRANTED
+            context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
     }
 }

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- IME keyboard surface (dark) -->
+    <color name="ime_background">#1B1D21</color>
+    <color name="ime_key">#2A2D33</color>
+    <color name="ime_key_stroke">#3A3E45</color>
+    <color name="ime_text_primary">#E6E8EB</color>
+    <color name="ime_text_secondary">#9AA3AE</color>
+    <color name="ime_accent">#8E9DFF</color>
+    <color name="ime_mic_active">#4355C5</color>
+    <color name="ime_mic_active_icon">#FFFFFF</color>
+    <color name="ime_error">#F2B8B5</color>
+</resources>

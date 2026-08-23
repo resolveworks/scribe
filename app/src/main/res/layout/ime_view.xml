@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/ime_background"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp">
+
+    <TextView
+        android:id="@+id/ime_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="18dp"
+        android:textSize="12sp"
+        android:textColor="@color/ime_text_secondary"
+        android:singleLine="true"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/ime_preview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="22dp"
+        android:layout_marginTop="2dp"
+        android:textSize="16sp"
+        android:textColor="@color/ime_text_primary"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:importantForAccessibility="no" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:baselineAligned="false"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/ime_delete"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/ime_key_bg"
+                android:src="@drawable/ic_ime_backspace"
+                android:scaleType="centerInside"
+                android:padding="12dp"
+                android:contentDescription="@string/ime_cd_delete" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
+
+            <ImageButton
+                android:id="@+id/ime_mic"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_gravity="center_horizontal"
+                android:background="@drawable/ime_mic_bg"
+                android:src="@drawable/ic_ime_mic"
+                android:scaleType="centerInside"
+                android:padding="16dp"
+                android:contentDescription="@string/ime_cd_mic_start" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="end">
+
+            <ImageButton
+                android:id="@+id/ime_enter"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/ime_key_bg"
+                android:src="@drawable/ic_ime_enter"
+                android:scaleType="centerInside"
+                android:padding="12dp"
+                android:contentDescription="@string/ime_cd_enter" />
+
+            <ImageButton
+                android:id="@+id/ime_switch"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/ime_key_bg"
+                android:src="@drawable/ic_ime_keyboard"
+                android:scaleType="centerInside"
+                android:padding="12dp"
+                android:contentDescription="@string/ime_cd_switch" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

@@ -12,4 +12,19 @@
     <string name="setup_open_picker">Select keyboard</string>
     <string name="setup_grant_mic">Grant microphone access</string>
     <string name="setup_all_set">All set — you can switch to Amanuensis from any text field.</string>
+
+    <string name="ime_subtype_voice_en">English (voice)</string>
+    <string name="ime_cd_mic_start">Start voice dictation</string>
+    <string name="ime_cd_mic_stop">Stop voice dictation</string>
+    <string name="ime_cd_mic_retry">Retry starting voice dictation</string>
+    <string name="ime_cd_delete">Delete</string>
+    <string name="ime_cd_enter">Enter</string>
+    <string name="ime_cd_switch">Switch keyboard</string>
+    <string name="ime_status_idle">Tap the microphone to dictate</string>
+    <string name="ime_status_loading">Preparing…</string>
+    <string name="ime_status_downloading">Downloading model… %1$d%%</string>
+    <string name="ime_status_listening">Listening…</string>
+    <string name="ime_status_failed">Something went wrong. Tap to retry.</string>
+    <string name="ime_status_sensitive">Voice dictation is off for passwords</string>
+    <string name="ime_status_unsupported">This field does not accept dictated text</string>
 </resources>

@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.amanuensis"
-        minSdk = 26
+        minSdk = 37
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
@@ -39,7 +39,6 @@ android {
 
 dependencies {
     // AndroidX base
-    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
 
