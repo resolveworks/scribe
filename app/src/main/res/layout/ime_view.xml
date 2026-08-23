@@ -59,7 +59,8 @@
         <FrameLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1">
+            android:layout_weight="1"
+            android:minHeight="64dp">
 
             <ImageButton
                 android:id="@+id/ime_mic"
@@ -71,6 +72,18 @@
                 android:scaleType="centerInside"
                 android:padding="16dp"
                 android:contentDescription="@string/ime_cd_mic_start" />
+
+            <!-- Shown in the mic slot while the engine loads, instead of a
+                 textual progress message. -->
+            <ProgressBar
+                android:id="@+id/ime_loading"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                android:indeterminateTint="@color/ime_accent"
+                android:visibility="gone"
+                android:contentDescription="@string/ime_cd_loading" />
         </FrameLayout>
 
         <LinearLayout

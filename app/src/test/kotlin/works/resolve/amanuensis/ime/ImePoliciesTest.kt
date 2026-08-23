@@ -169,3 +169,96 @@ class EditorActionsTest {
         assertEquals(Decision.Perform(EditorInfo.IME_ACTION_SEND), decision)
     }
 }
+
+class AutoStartPolicyTest {
+
+    @Test
+    fun startsOnDictatableFieldWithCachedModelAndMicPermission() {
+        assertEquals(
+            true,
+            AutoStartPolicy.shouldStartOnOpen(
+                FieldKind.DICTATABLE,
+                modelPresent = true,
+                micPermissionGranted = true,
+                dictationActive = false,
+            ),
+        )
+    }
+
+    @Test
+    fun neverStartsInSensitiveOrUnsupportedFields() {
+        assertEquals(
+            false,
+            AutoStartPolicy.shouldStartOnOpen(
+                FieldKind.SENSITIVE,
+                modelPresent = true,
+                micPermissionGranted = true,
+                dictationActive = false,
+            ),
+        )
+        assertEquals(
+            false,
+            AutoStartPolicy.shouldStartOnOpen(
+                FieldKind.UNSUPPORTED,
+                modelPresent = true,
+                micPermissionGranted = true,
+                dictationActive = false,
+            ),
+        )
+    }
+
+    @Test
+    fun defersWhileModelCheckIsInFlight() {
+        assertEquals(
+            false,
+            AutoStartPolicy.shouldStartOnOpen(
+                FieldKind.DICTATABLE,
+                modelPresent = null,
+                micPermissionGranted = true,
+                dictationActive = false,
+            ),
+        )
+    }
+
+    @Test
+    fun missingModelNeverAutoStarts() {
+        assertEquals(
+            false,
+            AutoStartPolicy.shouldStartOnOpen(
+                FieldKind.DICTATABLE,
+                modelPresent = false,
+                micPermissionGranted = true,
+                dictationActive = false,
+            ),
+        )
+    }
+
+    @Test
+    fun noMicPermissionNeverAutoStarts() {
+        // Auto-starting without the permission would fire the runtime
+        // permission dialog over the host app; repeated denials make Android
+        // permanently deny the permission.
+        assertEquals(
+            false,
+            AutoStartPolicy.shouldStartOnOpen(
+                FieldKind.DICTATABLE,
+                modelPresent = true,
+                micPermissionGranted = false,
+                dictationActive = false,
+            ),
+        )
+    }
+
+    @Test
+    fun doesNotRestartAnActiveDictation() {
+        assertEquals(
+            false,
+            AutoStartPolicy.shouldStartOnOpen(
+                FieldKind.DICTATABLE,
+                modelPresent = true,
+                micPermissionGranted = true,
+                dictationActive = true,
+            ),
+        )
+    }
+}

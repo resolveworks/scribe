@@ -19,14 +19,15 @@
     <string name="ime_cd_mic_start">Start voice dictation</string>
     <string name="ime_cd_mic_stop">Stop voice dictation</string>
     <string name="ime_cd_mic_retry">Retry starting voice dictation</string>
+    <string name="ime_cd_loading">Preparing voice dictation</string>
     <string name="ime_cd_delete">Delete</string>
     <string name="ime_cd_enter">Enter</string>
     <string name="ime_key_delete">⌫</string>
     <string name="ime_key_enter">⏎</string>
     <string name="ime_status_idle">Tap the microphone to dictate</string>
     <string name="ime_status_model_missing">Finish setup to download the speech model</string>
+    <string name="ime_status_permission_missing">Finish setup to allow the microphone</string>
     <string name="ime_status_loading">Preparing…</string>
-    <string name="ime_status_downloading">Downloading model… %1$d%%</string>
     <string name="ime_status_listening">Listening…</string>
     <string name="ime_status_failed">Something went wrong. Tap to retry.</string>
     <string name="ime_status_sensitive">Voice dictation is off for passwords</string>

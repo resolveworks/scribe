@@ -1,6 +1,8 @@
 package works.resolve.amanuensis
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
@@ -9,9 +11,11 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.widget.ImageButton
+import android.widget.ProgressBar
 import android.widget.TextView
 import ai.moonshine.voice.MicTranscriber
 import ai.moonshine.voice.TranscriptLine
+import works.resolve.amanuensis.ime.AutoStartPolicy
 import works.resolve.amanuensis.ime.EditorActions
 import works.resolve.amanuensis.ime.EditorPolicy
 import works.resolve.amanuensis.ime.TextJoining
@@ -71,6 +75,13 @@ class AmanuensisInputMethodService : InputMethodService() {
     /** Guards against repeatedly pushing the setup screen over the host app. */
     private var setupPromptShown = false
 
+    /**
+     * Set when the keyboard opens while the model-cache check is still in
+     * flight; the check's callback then starts dictation instead of leaving
+     * the keyboard sitting idle until a mic press.
+     */
+    private var autoStartPending = false
+
     private var fieldKind = EditorPolicy.FieldKind.DICTATABLE
 
     // UI references; the input view is a plain XML layout, recreated by the
@@ -79,6 +90,7 @@ class AmanuensisInputMethodService : InputMethodService() {
     private var statusView: TextView? = null
     private var previewView: TextView? = null
     private var micButton: ImageButton? = null
+    private var loadingView: ProgressBar? = null
 
     // -- Lifecycle -----------------------------------------------------------
 
@@ -89,14 +101,6 @@ class AmanuensisInputMethodService : InputMethodService() {
             .onText(::onPartialText)
             .onLine(::onFinalLine)
             .onError { onEngineError() }
-            .onProgress { fraction, _ ->
-                // Called from the downloader thread; hop to the main thread.
-                main.post {
-                    if (!destroyed && engineState == EngineState.LOADING) {
-                        setStatus(getString(R.string.ime_status_downloading, (fraction * 100).toInt()))
-                    }
-                }
-            }
     }
 
     override fun onDestroy() {
@@ -116,6 +120,7 @@ class AmanuensisInputMethodService : InputMethodService() {
         statusView = view.findViewById(R.id.ime_status)
         previewView = view.findViewById(R.id.ime_preview)
         micButton = view.findViewById<ImageButton>(R.id.ime_mic).also { it.setOnClickListener { onMicClicked() } }
+        loadingView = view.findViewById(R.id.ime_loading)
         view.findViewById<TextView>(R.id.ime_delete).setOnClickListener { deleteBackwards() }
         view.findViewById<TextView>(R.id.ime_enter).setOnClickListener { performEnter() }
         applyFieldKind()
@@ -129,6 +134,7 @@ class AmanuensisInputMethodService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         fieldKind = EditorPolicy.classify(info?.inputType ?: 0)
+        autoStartPending = false
         if (modelPresent != true) {
             // The model may have been downloaded in setup since the last look;
             // re-check the cache off the main thread.
@@ -149,14 +155,19 @@ class AmanuensisInputMethodService : InputMethodService() {
         }
         applyFieldKind()
         refreshMicButton()
+        // The keyboard just opened: begin dictating right away instead of
+        // waiting for a mic press.
+        maybeAutoStartDictation()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        autoStartPending = false
         stopDictation()
         super.onFinishInputView(finishingInput)
     }
 
     override fun onWindowHidden() {
+        autoStartPending = false
         stopDictation()
         super.onWindowHidden()
     }
@@ -172,6 +183,8 @@ class AmanuensisInputMethodService : InputMethodService() {
             EditorPolicy.FieldKind.DICTATABLE -> when {
                 modelPresent == false ->
                     setStatus(getString(R.string.ime_status_model_missing))
+                !micPermissionGranted() ->
+                    setStatus(getString(R.string.ime_status_permission_missing))
                 modelPresent == null ->
                     // First model-cache check still running.
                     setStatus(getString(R.string.ime_status_loading))
@@ -197,6 +210,50 @@ class AmanuensisInputMethodService : InputMethodService() {
             engineState != EngineState.LOADING &&
             engineState != EngineState.STOPPING
 
+    /**
+     * Cheap synchronous check; the IME never requests the permission itself.
+     * Without it, start() would push the SDK's permission dialog over the
+     * host app at every open until Android permanently denies the permission
+     * — setup owns requests.
+     */
+    private fun micPermissionGranted(): Boolean =
+        checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    // -- Auto-start ----------------------------------------------------------
+
+    /**
+     * Whether a dictation is loading or already running; such a session is
+     * never auto-restarted. A stop in flight (STOPPING) is deliberately not
+     * "active": the serialized worker runs the queued mic.stop() before any
+     * newly queued load/start, so auto-starting over it is safe.
+     */
+    private fun dictationActive(): Boolean =
+        engineState == EngineState.LOADING || engineState == EngineState.LISTENING
+
+    /**
+     * Starts dictation without a mic press whenever the keyboard opens on a
+     * field that accepts dictated text. While the model-cache check is still
+     * in flight the decision is deferred to its callback via
+     * [autoStartPending].
+     */
+    private fun maybeAutoStartDictation() {
+        if (fieldKind != EditorPolicy.FieldKind.DICTATABLE) return
+        when (modelPresent) {
+            null -> autoStartPending = true
+            true -> if (
+                AutoStartPolicy.shouldStartOnOpen(
+                    fieldKind,
+                    modelPresent,
+                    micPermissionGranted(),
+                    dictationActive(),
+                )
+            ) {
+                startDictation()
+            }
+            false -> Unit // Missing model: the setup flow owns this case.
+        }
+    }
+
     // -- Model cache --------------------------------------------------------
 
     private fun checkModel(launchSetupIfMissing: Boolean) {
@@ -211,6 +268,10 @@ class AmanuensisInputMethodService : InputMethodService() {
                 }
                 applyFieldKind()
                 refreshMicButton()
+                if (autoStartPending) {
+                    autoStartPending = false
+                    maybeAutoStartDictation()
+                }
             }
         }
     }
@@ -229,6 +290,7 @@ class AmanuensisInputMethodService : InputMethodService() {
         when {
             modelPresent == false -> openSetupScreen()
             modelPresent == null -> Unit // Model-cache check still running.
+            !micPermissionGranted() -> openSetupScreen() // Setup owns permission requests.
             !micEnabled() -> return
             engineState == EngineState.LISTENING -> stopDictation()
             else -> startDictation()
@@ -429,6 +491,12 @@ class AmanuensisInputMethodService : InputMethodService() {
 
     private fun refreshMicButton() {
         val button = micButton ?: return
+        // While the engine loads, the mic slot shows a plain indeterminate
+        // spinner instead of the button (and instead of any textual progress).
+        val loading = engineState == EngineState.LOADING
+        loadingView?.visibility = if (loading) View.VISIBLE else View.GONE
+        button.visibility = if (loading) View.GONE else View.VISIBLE
+        if (loading) return
         when (engineState) {
             EngineState.LISTENING -> {
                 button.setImageResource(R.drawable.ic_ime_stop)

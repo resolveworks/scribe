@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
@@ -30,6 +31,16 @@ class MainActivity : ComponentActivity() {
 
     /** The Moonshine cache check and download block; keep them serialized off the main thread. */
     private val worker: ExecutorService = Executors.newSingleThreadExecutor()
+
+    /**
+     * Whether the mic permission has been requested from this install at
+     * least once. Disambiguates `shouldShowRequestPermissionRationale`:
+     * false means "never asked" before the first request and "permanently
+     * denied" (Android suppressed the dialog after repeated denials) after.
+     */
+    private val askedMicBefore: Boolean
+        get() = getSharedPreferences("setup", Context.MODE_PRIVATE)
+            .getBoolean(KEY_MIC_ASKED, false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,7 +91,37 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestMicPermission() {
+        if (isMicGranted(this)) return
+        if (micPermissionDialogSuppressed()) {
+            // Permanently denied: the system will never show the dialog
+            // again, so route to this app's page in system settings, where
+            // the user can re-enable the microphone.
+            openAppPermissionSettings()
+            return
+        }
+        getSharedPreferences("setup", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_MIC_ASKED, true)
+            .apply()
         micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    }
+
+    /**
+     * True once Android has fixed (permanently denied) the permission: we
+     * have asked before, the user has not granted, and the platform will no
+     * longer show a rationale-capable dialog.
+     */
+    private fun micPermissionDialogSuppressed(): Boolean =
+        askedMicBefore &&
+            !shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)
+
+    private fun openAppPermissionSettings() {
+        startActivity(
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", packageName, null),
+            )
+        )
     }
 
     private fun downloadModel() {
@@ -103,9 +144,16 @@ class MainActivity : ComponentActivity() {
     private val micPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             micGranted = granted || isMicGranted(this)
+            if (!micGranted && micPermissionDialogSuppressed()) {
+                // The dialog was suppressed and the request returned instantly
+                // denied; the only path forward is the system settings page.
+                openAppPermissionSettings()
+            }
         }
 
     companion object {
+        private const val KEY_MIC_ASKED = "mic_asked_before"
+
         fun isImeEnabled(context: Context): Boolean =
             context.getSystemService(InputMethodManager::class.java)
                 ?.enabledInputMethodList
