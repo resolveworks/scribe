@@ -58,34 +58,28 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
     private var engineState = EngineState.IDLE
 
     /**
-     * The InputConnection captured when the current dictation session started.
-     * A late final callback is dropped unless it still matches the editor the
-     * user was dictating into.
+     * One dictation session: the editor connection captured at start, plus
+     * per-line state. Moonshine flushes the trailing final line *after*
+     * stop() returns, so a live session deliberately outlives LISTENING —
+     * ending it is what drops a late final.
      */
-    private var sessionConnection: InputConnection? = null
+    private class Session(val connection: InputConnection) {
+        /** Separator for the line being dictated, until it is committed. */
+        var pendingSeparator: String? = null
+    }
 
-    /** Separator computed for the line currently being dictated, until committed. */
-    private var pendingSeparator: String? = null
+    private var session: Session? = null
 
     /** Monotonic id of the latest load/start request; see [startDictation]. */
     @Volatile private var requestGeneration = 0
 
-    /**
-     * Whether the Moonshine model is cached. Null until the first (async)
-     * cache check completes. True is sticky for the process lifetime; false
-     * re-checks on every input start, so a model downloaded in setup later
-     * in this same process is picked up.
-     */
+    /** Null until the first async cache check; false re-checks, so a model downloaded in setup mid-process is picked up. */
     @Volatile private var modelPresent: Boolean? = null
 
     /** Guards against repeatedly pushing the setup screen over the host app. */
     private var setupPromptShown = false
 
-    /**
-     * Set when the keyboard opens while the model-cache check is still in
-     * flight; the check's callback then starts dictation instead of leaving
-     * the keyboard sitting idle until a mic press.
-     */
+    /** Keyboard opened while the cache check is in flight; its callback then auto-starts. */
     private var autoStartPending = false
 
     // ComposeView needs owners when it is hosted outside an Activity or
@@ -117,8 +111,8 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         destroyed = true
         val m = mic
         mic = null
-        // close() interrupts threads and joins; never run it on the main
-        // thread, and never concurrently with a blocking load()/start().
+        // close() interrupts threads and joins; keep it off the main thread,
+        // serialized after any in-flight load()/start().
         worker.execute { runCatching { m?.close() } }
         worker.shutdown()
         inputComposeView?.disposeComposition()
@@ -157,28 +151,24 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
     // Never take over the whole screen, in either orientation.
     override fun onEvaluateFullscreenMode(): Boolean = false
 
+    override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
+        super.onStartInput(info, restarting)
+        if (!restarting) {
+            // Different editor: drop any trailing final still in flight for the old one.
+            session = null
+        }
+    }
+
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         autoStartPending = false
         if (modelPresent != true) {
-            // The model may have been downloaded in setup since the last look;
-            // re-check the cache off the main thread.
+            // The model may have been downloaded in setup since the last look.
             checkModel(launchSetupIfMissing = !restarting)
         }
-        // A trailing final from a normal stop may still be in flight for the
-        // editor we were just dictating into; only if a *different* editor is
-        // now focused do we wipe the session, so an old editor's transcript
-        // is never committed into the new field.
-        val sameEditor = sessionConnection !== null && sessionConnection === currentInputConnection
         stopDictation()
-        if (!sameEditor) {
-            sessionConnection = null
-            pendingSeparator = null
-        }
         refreshStatus()
         refreshMicButton()
-        // The keyboard just opened: begin dictating right away instead of
-        // waiting for a mic press.
         maybeAutoStartDictation()
     }
 
@@ -210,8 +200,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                 setStatus(getString(R.string.ime_status_permission_missing))
             engineState == EngineState.FAILED ->
                 setStatus(getString(R.string.ime_status_failed))
-            // LOADING/STOPPING and the initial model-cache check show
-            // no status line; the mic button's loader covers loading.
+            // LOADING/STOPPING show no status; the mic button's loader covers them.
             else -> setStatus("")
         }
     }
@@ -220,32 +209,17 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         engineState != EngineState.LOADING &&
             engineState != EngineState.STOPPING
 
-    /**
-     * Cheap synchronous check; the IME never requests the permission itself.
-     * Without it, start() would push the SDK's permission dialog over the
-     * host app at every open until Android permanently denies the permission
-     * — setup owns requests.
-     */
+    /** The IME never requests the permission itself — setup owns requests, so the SDK dialog can't pop over the host app. */
     private fun micPermissionGranted(): Boolean =
         checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
     // -- Auto-start ----------------------------------------------------------
 
-    /**
-     * Whether a dictation is loading or already running; such a session is
-     * never auto-restarted. A stop in flight (STOPPING) is deliberately not
-     * "active": the serialized worker runs the queued mic.stop() before any
-     * newly queued load/start, so auto-starting over it is safe.
-     */
+    /** STOPPING is deliberately not active: the serialized worker drains the queued stop before any new load/start. */
     private fun dictationActive(): Boolean =
         engineState == EngineState.LOADING || engineState == EngineState.LISTENING
 
-    /**
-     * Starts dictation without a mic press whenever the keyboard opens on a
-     * field that accepts dictated text. While the model-cache check is still
-     * in flight the decision is deferred to its callback via
-     * [autoStartPending].
-     */
+    /** Starts dictation without a mic press on keyboard open; deferred via [autoStartPending] while the cache check runs. */
     private fun maybeAutoStartDictation() {
         when (modelPresent) {
             null -> autoStartPending = true
@@ -285,8 +259,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
     }
 
     private fun openSetupScreen() {
-        // The model is downloaded here during setup; bring it forward at the
-        // point of use, the same way the system mic-permission prompt appears.
+        // Bring setup forward at the point of use, like the system permission prompt.
         startActivity(
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
@@ -306,16 +279,12 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
     }
 
     private fun startDictation() {
-        val ic = currentInputConnection ?: return
-        sessionConnection = ic
-        pendingSeparator = null
+        session = Session(currentInputConnection ?: return)
         engineState = EngineState.LOADING
         val generation = ++requestGeneration
         setStatus("") // Any previous status line is cleared; the loader shows loading.
         refreshMicButton()
-        // load() downloads the model on first use and start() may block on a
-        // permission prompt; both stay off the main thread on the single
-        // serialized worker so lifecycle operations can never interleave.
+        // load()/start() block; keep them off the main thread, serialized on the worker.
         worker.execute {
             try {
                 mic?.load()
@@ -331,11 +300,8 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                 }
                 return@execute
             }
-            // Cancelled while load() was blocking: do not call start() at
-            // all, so the permission dialog/microphone can never pop up
-            // after the keyboard hid. The ordered stop queued by
-            // stopDictation() follows on this same serialized worker and
-            // acknowledges STOPPING -> READY.
+            // Cancelled mid-load: skip start() so the mic/permission dialog
+            // can never appear after the keyboard hid.
             if (generation != requestGeneration) return@execute
             try {
                 mic?.start()
@@ -359,10 +325,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                     setStatus("")
                     refreshMicButton()
                 }
-                // Otherwise the IME was hidden or the session stopped while
-                // the blocking load()/start() was in flight: stopDictation()
-                // already queued an ordered mic.stop() behind this job, so
-                // the microphone cannot keep recording.
+                // Else a queued mic.stop() already follows on the worker.
             }
         }
     }
@@ -373,25 +336,17 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                 engineState = EngineState.READY
                 setStatus("")
                 refreshMicButton()
-                // Non-blocking; Moonshine flushes the trailing line, which
-                // arrives as a final onLine callback while the connection
-                // guard is still valid.
+                // The trailing final arrives after stop() returns; the session stays live for it.
                 mic?.stop()
             }
             EngineState.LOADING -> {
-                // The worker is still inside blocking load()/start(). Enter
-                // the non-startable STOPPING state, invalidate the session
-                // so a late final callback can never be committed, and queue
-                // an ordered mic.stop() that runs strictly after the
-                // in-flight load/start job — the serialized executor
-                // guarantees the ordering. Calling stop() now instead would
-                // race start() setting its running flag and be lost. Only
-                // the acknowledgement below re-exposes READY, so no second
-                // request can start against the dying one.
+                // Worker is inside blocking load()/start(): enter the
+                // non-startable STOPPING state, end the session, and queue
+                // mic.stop() strictly after the in-flight job. Only the
+                // ack below re-exposes READY.
                 engineState = EngineState.STOPPING
-                requestGeneration++ // Invalidate the in-flight load/start request.
-                sessionConnection = null
-                pendingSeparator = null
+                requestGeneration++ // Invalidate the in-flight request.
+                session = null
                 setStatus("")
                 refreshMicButton()
                 worker.execute {
@@ -411,31 +366,28 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
 
     private fun onPartialText(text: String) {
         if (destroyed || engineState != EngineState.LISTENING) return
-        val ic = sessionConnection ?: return
-        if (currentInputConnection !== ic) return
-        ic.setComposingText(separatorFor(ic) + text, 1)
+        val s = session ?: return
+        s.connection.setComposingText(separatorFor(s) + text, 1)
     }
 
     private fun onFinalLine(line: TranscriptLine) {
         if (destroyed) return
-        val ic = sessionConnection ?: return
-        if (currentInputConnection !== ic) return
+        val s = session ?: return
         val text = line.text.orEmpty()
         if (text.isNotEmpty()) {
             // Replaces the composing (partial) region and commits the final line.
-            ic.commitText(separatorFor(ic) + text, 1)
+            s.connection.commitText(separatorFor(s) + text, 1)
         } else {
-            ic.finishComposingText()
+            s.connection.finishComposingText()
         }
-        pendingSeparator = null
+        s.pendingSeparator = null
     }
 
-    private fun separatorFor(ic: InputConnection): String {
+    private fun separatorFor(s: Session): String {
         // Computed once per segment, from the text before the composing span.
-        pendingSeparator?.let { return it }
-        val separator = TextJoining.leadingSeparator(ic.getTextBeforeCursor(1, 0))
-        pendingSeparator = separator
-        return separator
+        s.pendingSeparator?.let { return it }
+        return TextJoining.leadingSeparator(s.connection.getTextBeforeCursor(1, 0))
+            .also { s.pendingSeparator = it }
     }
 
     private fun onEngineError() {
@@ -452,13 +404,10 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         val ic = currentInputConnection ?: return
         ic.finishComposingText()
         if (ic.getSelectedText(0)?.isNotEmpty() == true) {
-            // Replace the active selection with nothing: commitText("") is
-            // the documented way to delete selected text.
+            // commitText("") is the documented way to delete selected text.
             ic.commitText("", 1)
         } else {
-            // No selection: delete exactly one Unicode code point, so
-            // surrogate pairs (emoji) and other non-BMP characters go in a
-            // single press.
+            // One code point per press, so surrogate pairs (emoji) go together.
             ic.deleteSurroundingTextInCodePoints(1, 0)
         }
     }
