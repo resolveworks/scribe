@@ -1,9 +1,9 @@
 package works.resolve.amanuensis.ui.ime
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -49,25 +49,23 @@ internal fun ImeKeyboard(
     modifier: Modifier = Modifier,
 ) {
     Surface(modifier = modifier.fillMaxWidth()) {
-        // The IME window's height wraps this view's measured height, so it
-        // must be deterministic: a fixed-height content area whose status
-        // band is always reserved (a status line appearing and disappearing
-        // must never resize the keyboard) and whose control row is centered
-        // regardless of state. navigationBarsPadding comes first so the
-        // fixed height lands fully above the edge-to-edge nav bar.
-        Box(
+        // Wrap-content layout: the IME window sizes itself to this view's
+        // measured height, so nothing here fixes geometry. The framework
+        // owns the only structural spacing — navigationBarsPadding lifts the
+        // content above the edge-to-edge nav bar (the surface color still
+        // paints behind it) — and the controls get modest vertical padding.
+        // A status line, when shown, simply grows the keyboard by one line,
+        // the way a candidates view does.
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 16.dp)
-                .height(112.dp), // 24dp status band + 64dp controls + 24dp
+                .padding(horizontal = 16.dp),
         ) {
             if (state.status.isNotBlank()) {
                 Text(
                     text = state.status,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopStart),
+                    modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
@@ -77,7 +75,7 @@ internal fun ImeKeyboard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.Center),
+                    .padding(vertical = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 KeyboardKey(
