@@ -26,7 +26,6 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import works.resolve.amanuensis.ime.AutoStartPolicy
 import works.resolve.amanuensis.ime.EditorActions
-import works.resolve.amanuensis.ime.EditorPolicy
 import works.resolve.amanuensis.ime.TextJoining
 import works.resolve.amanuensis.ui.ime.ImeKeyboard
 import works.resolve.amanuensis.ui.ime.ImeUiState
@@ -89,8 +88,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
      */
     private var autoStartPending = false
 
-    private var fieldKind = EditorPolicy.FieldKind.DICTATABLE
-
     // ComposeView needs owners when it is hosted outside an Activity or
     // Fragment. Their lifetime follows the service/window callbacks.
     private val lifecycleRegistry = LifecycleRegistry(this)
@@ -132,7 +129,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
 
     override fun onCreateInputView(): View {
         inputComposeView?.disposeComposition()
-        applyFieldKind()
+        refreshStatus()
         refreshMicButton()
         // A window Recomposer looks up its owners from the IME window's root,
         // not only from the returned input view, so install them on both.
@@ -162,7 +159,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        fieldKind = EditorPolicy.classify(info?.inputType ?: 0)
         autoStartPending = false
         if (modelPresent != true) {
             // The model may have been downloaded in setup since the last look;
@@ -179,7 +175,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
             sessionConnection = null
             pendingSeparator = null
         }
-        applyFieldKind()
+        refreshStatus()
         refreshMicButton()
         // The keyboard just opened: begin dictating right away instead of
         // waiting for a mic press.
@@ -206,30 +202,22 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
 
     // -- Field handling ------------------------------------------------------
 
-    private fun applyFieldKind() {
-        when (fieldKind) {
-            EditorPolicy.FieldKind.SENSITIVE ->
-                setStatus(getString(R.string.ime_status_sensitive))
-            EditorPolicy.FieldKind.UNSUPPORTED ->
-                setStatus(getString(R.string.ime_status_unsupported))
-            EditorPolicy.FieldKind.DICTATABLE -> when {
-                modelPresent == false ->
-                    setStatus(getString(R.string.ime_status_model_missing))
-                !micPermissionGranted() ->
-                    setStatus(getString(R.string.ime_status_permission_missing))
-                else -> when (engineState) {
-                    EngineState.FAILED -> setStatus(getString(R.string.ime_status_failed))
-                    // LOADING/STOPPING and the initial model-cache check show
-                    // no status line; the mic button's loader covers loading.
-                    else -> setStatus("")
-                }
-            }
+    private fun refreshStatus() {
+        when {
+            modelPresent == false ->
+                setStatus(getString(R.string.ime_status_model_missing))
+            !micPermissionGranted() ->
+                setStatus(getString(R.string.ime_status_permission_missing))
+            engineState == EngineState.FAILED ->
+                setStatus(getString(R.string.ime_status_failed))
+            // LOADING/STOPPING and the initial model-cache check show
+            // no status line; the mic button's loader covers loading.
+            else -> setStatus("")
         }
     }
 
     private fun micEnabled(): Boolean =
-        fieldKind == EditorPolicy.FieldKind.DICTATABLE &&
-            engineState != EngineState.LOADING &&
+        engineState != EngineState.LOADING &&
             engineState != EngineState.STOPPING
 
     /**
@@ -259,12 +247,10 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
      * [autoStartPending].
      */
     private fun maybeAutoStartDictation() {
-        if (fieldKind != EditorPolicy.FieldKind.DICTATABLE) return
         when (modelPresent) {
             null -> autoStartPending = true
             true -> if (
                 AutoStartPolicy.shouldStartOnOpen(
-                    fieldKind,
                     modelPresent,
                     micPermissionGranted(),
                     dictationActive(),
@@ -288,7 +274,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                     setupPromptShown = true
                     openSetupScreen()
                 }
-                applyFieldKind()
+                refreshStatus()
                 refreshMicButton()
                 if (autoStartPending) {
                     autoStartPending = false
@@ -414,7 +400,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                         if (!destroyed && engineState == EngineState.STOPPING) {
                             engineState = EngineState.READY
                             refreshMicButton()
-                            applyFieldKind()
+                            refreshStatus()
                         }
                     }
                 }
@@ -427,13 +413,11 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         if (destroyed || engineState != EngineState.LISTENING) return
         val ic = sessionConnection ?: return
         if (currentInputConnection !== ic) return
-        // Sensitive fields must never receive dictated content.
-        if (fieldKind != EditorPolicy.FieldKind.DICTATABLE) return
         ic.setComposingText(separatorFor(ic) + text, 1)
     }
 
     private fun onFinalLine(line: TranscriptLine) {
-        if (destroyed || fieldKind != EditorPolicy.FieldKind.DICTATABLE) return
+        if (destroyed) return
         val ic = sessionConnection ?: return
         if (currentInputConnection !== ic) return
         val text = line.text.orEmpty()

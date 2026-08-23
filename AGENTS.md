@@ -29,9 +29,9 @@ keyboards, transcript history, cloud services.
     the model here; the IME checks presence without a blocking `load()`. The
     spec must mirror `MicTranscriber`'s defaults so both hit the same cache
     directory.
-  - `ime/ImePolicies.kt` — pure, unit-tested policy helpers (field
-    classification incl. passwords, separator logic, enter-key decision).
-    Keep new logic pure here, not in the service.
+  - `ime/ImePolicies.kt` — pure, unit-tested policy helpers (separator
+    logic, enter-key decision, auto-start decision). Keep new logic pure
+    here, not in the service.
 - `app/src/main/res/` — icons and `xml/input_method.xml` (single en-US voice
   subtype).
 
@@ -72,8 +72,6 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 - **Never log or persist transcripts or audio.** Recognition is on-device;
   audio must never leave the device. The INTERNET permission exists only for
   the one-time first-use model download.
-- **No dictation in sensitive fields.** `EditorPolicy` disables the mic and
-  preview for password-type inputs; keep it that way for any new field types.
 - **IME UI stays minimal.** A standalone ComposeView returned from
   `onCreateInputView()` uses standard Material 3 components. No Fragments or
   persistent UI state in the IME process.

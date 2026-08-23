@@ -10,12 +10,12 @@ an on-device speech recognition toolkit.
 ## Features
 
 - Voice dictation into any text field, via Android's standard input-method
-  (keyboard) mechanism.
+  (keyboard) mechanism. You decide where to dictate — no field type is
+  blocked.
 - Live partial transcription while you speak; each finished speech segment is
   committed as final text.
 - Basic editing keys: delete, enter, and switch back to your previous
   keyboard.
-- Dictation is automatically disabled in password fields.
 - On-device recognition: your speech never leaves the device, and nothing is
   recorded, stored, or uploaded.
 

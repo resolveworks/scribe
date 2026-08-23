@@ -1,46 +1,12 @@
 package works.resolve.amanuensis.ime
 
-import android.text.InputType
 import android.view.inputmethod.EditorInfo
 
-/**
- * Pure policy helpers for the IME. Kept free of Android object graphs so they
- * are trivially unit-testable; the service feeds them values from
- * [android.view.inputmethod.EditorInfo].
- */
-object EditorPolicy {
-
-    /** What kind of editor the IME is attached to. */
-    enum class FieldKind { DICTATABLE, SENSITIVE, UNSUPPORTED }
-
-    /**
-     * Classifies an `EditorInfo.inputType`. Password-style text fields (plain,
-     * visible, and web variations) and numeric password fields are sensitive:
-     * dictation is disabled for them. `TYPE_NULL` means
-     * the editor did not declare an input type, so we cannot trust it.
-     */
-    fun classify(inputType: Int): FieldKind {
-        val clazz = inputType and InputType.TYPE_MASK_CLASS
-        val variation = inputType and InputType.TYPE_MASK_VARIATION
-        return when (clazz) {
-            InputType.TYPE_NULL -> FieldKind.UNSUPPORTED
-            InputType.TYPE_CLASS_TEXT -> when (variation) {
-                InputType.TYPE_TEXT_VARIATION_PASSWORD,
-                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
-                InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
-                -> FieldKind.SENSITIVE
-                else -> FieldKind.DICTATABLE
-            }
-            InputType.TYPE_CLASS_NUMBER ->
-                if (variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD) {
-                    FieldKind.SENSITIVE
-                } else {
-                    FieldKind.DICTATABLE
-                }
-            else -> FieldKind.DICTATABLE
-        }
-    }
-}
+//
+// Pure policy helpers for the IME. Kept free of Android object graphs so
+// they are trivially unit-testable; the service feeds them values from
+// android.view.inputmethod.EditorInfo.
+//
 
 /**
  * Decides what separator to place before a dictated segment, given the text
@@ -96,8 +62,9 @@ object EditorActions {
 object AutoStartPolicy {
 
     /**
-     * Auto-start only on a dictatable field with a confirmed-cached model and
-     * the microphone permission already granted.
+     * Auto-start only with a confirmed-cached model and the microphone
+     * permission already granted; whether to dictate into the focused field
+     * is the user's decision, not the keyboard's.
      *
      * - A [modelPresent] of null means the cache check is still running; the
      *   caller must defer (or do nothing), not start.
@@ -113,13 +80,11 @@ object AutoStartPolicy {
      *   serialized worker, so the two can never interleave.
      */
     fun shouldStartOnOpen(
-        fieldKind: EditorPolicy.FieldKind,
         modelPresent: Boolean?,
         micPermissionGranted: Boolean,
         dictationActive: Boolean,
     ): Boolean =
-        fieldKind == EditorPolicy.FieldKind.DICTATABLE &&
-            modelPresent == true &&
+        modelPresent == true &&
             micPermissionGranted &&
             !dictationActive
 }
