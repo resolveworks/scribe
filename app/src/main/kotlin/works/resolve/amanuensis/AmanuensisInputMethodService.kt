@@ -10,15 +10,28 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
-import android.widget.ImageButton
-import android.widget.ProgressBar
-import android.widget.TextView
 import ai.moonshine.voice.MicTranscriber
 import ai.moonshine.voice.TranscriptLine
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ComposeView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import works.resolve.amanuensis.ime.AutoStartPolicy
 import works.resolve.amanuensis.ime.EditorActions
 import works.resolve.amanuensis.ime.EditorPolicy
 import works.resolve.amanuensis.ime.TextJoining
+import works.resolve.amanuensis.ui.ime.ImeKeyboard
+import works.resolve.amanuensis.ui.ime.ImeUiState
+import works.resolve.amanuensis.ui.ime.MicVisualState
+import works.resolve.amanuensis.ui.theme.AmanuensisTheme
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -31,7 +44,7 @@ import java.util.concurrent.Executors
  * (composing text), `onLine` as a finished line (committed text), and the
  * model stays loaded and reusable while the service lives.
  */
-class AmanuensisInputMethodService : InputMethodService() {
+class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
 
     private enum class EngineState { IDLE, LOADING, STOPPING, READY, LISTENING, FAILED }
 
@@ -84,18 +97,24 @@ class AmanuensisInputMethodService : InputMethodService() {
 
     private var fieldKind = EditorPolicy.FieldKind.DICTATABLE
 
-    // UI references; the input view is a plain XML layout, recreated by the
-    // framework on configuration changes. onCreateInputView re-renders the
-    // current engine/field state into every new view.
-    private var statusView: TextView? = null
-    private var previewView: TextView? = null
-    private var micButton: ImageButton? = null
-    private var loadingView: ProgressBar? = null
+    // ComposeView needs owners when it is hosted outside an Activity or
+    // Fragment. Their lifetime follows the service/window callbacks.
+    private val lifecycleRegistry = LifecycleRegistry(this)
+    private val savedStateController = SavedStateRegistryController.create(this)
+    override val lifecycle: Lifecycle get() = lifecycleRegistry
+    override val savedStateRegistry: SavedStateRegistry
+        get() = savedStateController.savedStateRegistry
+
+    private var inputComposeView: ComposeView? = null
+    private var uiState by mutableStateOf(ImeUiState())
 
     // -- Lifecycle -----------------------------------------------------------
 
     override fun onCreate() {
         super.onCreate()
+        savedStateController.performAttach()
+        savedStateController.performRestore(null)
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         worker = Executors.newSingleThreadExecutor()
         mic = MicTranscriber(this)
             .onText(::onPartialText)
@@ -111,21 +130,37 @@ class AmanuensisInputMethodService : InputMethodService() {
         // thread, and never concurrently with a blocking load()/start().
         worker.execute { runCatching { m?.close() } }
         worker.shutdown()
+        inputComposeView?.disposeComposition()
+        inputComposeView = null
+        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         super.onDestroy()
     }
 
     override fun onCreateInputView(): View {
-        @Suppress("InflateParams") // Root is hosted by the IME window; it has no parent yet.
-        val view = layoutInflater.inflate(R.layout.ime_view, null)
-        statusView = view.findViewById(R.id.ime_status)
-        previewView = view.findViewById(R.id.ime_preview)
-        micButton = view.findViewById<ImageButton>(R.id.ime_mic).also { it.setOnClickListener { onMicClicked() } }
-        loadingView = view.findViewById(R.id.ime_loading)
-        view.findViewById<TextView>(R.id.ime_delete).setOnClickListener { deleteBackwards() }
-        view.findViewById<TextView>(R.id.ime_enter).setOnClickListener { performEnter() }
+        inputComposeView?.disposeComposition()
         applyFieldKind()
         refreshMicButton()
-        return view
+        // A window Recomposer looks up its owners from the IME window's root,
+        // not only from the returned input view, so install them on both.
+        window?.window?.decorView?.apply {
+            setViewTreeLifecycleOwner(this@AmanuensisInputMethodService)
+            setViewTreeSavedStateRegistryOwner(this@AmanuensisInputMethodService)
+        }
+        return ComposeView(this).apply {
+            setViewTreeLifecycleOwner(this@AmanuensisInputMethodService)
+            setViewTreeSavedStateRegistryOwner(this@AmanuensisInputMethodService)
+            setContent {
+                AmanuensisTheme {
+                    ImeKeyboard(
+                        state = uiState,
+                        onDelete = ::deleteBackwards,
+                        onMicClick = ::onMicClicked,
+                        onEnter = ::performEnter,
+                    )
+                }
+            }
+            inputComposeView = this
+        }
     }
 
     // Never take over the whole screen, in either orientation.
@@ -166,10 +201,16 @@ class AmanuensisInputMethodService : InputMethodService() {
         super.onFinishInputView(finishingInput)
     }
 
+    override fun onWindowShown() {
+        super.onWindowShown()
+        lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+    }
+
     override fun onWindowHidden() {
         autoStartPending = false
         stopDictation()
         super.onWindowHidden()
+        lifecycleRegistry.currentState = Lifecycle.State.CREATED
     }
 
     // -- Field handling ------------------------------------------------------
@@ -201,8 +242,6 @@ class AmanuensisInputMethodService : InputMethodService() {
         } else {
             setPreview(sessionText.toString() + (pendingSeparator ?: "") + partialText)
         }
-        micButton?.isEnabled = micEnabled()
-        micButton?.alpha = if (micButton?.isEnabled == true) 1f else 0.4f
     }
 
     private fun micEnabled(): Boolean =
@@ -482,45 +521,22 @@ class AmanuensisInputMethodService : InputMethodService() {
     // -- UI ------------------------------------------------------------------
 
     private fun setStatus(text: String) {
-        statusView?.text = text
+        uiState = uiState.copy(status = text)
     }
 
     private fun setPreview(text: String) {
-        previewView?.text = text
+        uiState = uiState.copy(preview = text)
     }
 
     private fun refreshMicButton() {
-        val button = micButton ?: return
-        // While the engine loads, the mic slot shows a plain indeterminate
-        // spinner instead of the button (and instead of any textual progress).
-        val loading = engineState == EngineState.LOADING
-        loadingView?.visibility = if (loading) View.VISIBLE else View.GONE
-        button.visibility = if (loading) View.GONE else View.VISIBLE
-        if (loading) return
-        when (engineState) {
-            EngineState.LISTENING -> {
-                button.setImageResource(R.drawable.ic_ime_stop)
-                button.setBackgroundResource(R.drawable.ime_mic_active_bg)
-                button.imageTintList =
-                    android.content.res.ColorStateList.valueOf(
-                        getColor(R.color.ime_mic_active_icon)
-                    )
-                button.contentDescription = getString(R.string.ime_cd_mic_stop)
-            }
-            EngineState.FAILED -> {
-                button.setImageResource(R.drawable.ic_ime_mic)
-                button.setBackgroundResource(R.drawable.ime_mic_bg)
-                button.imageTintList =
-                    android.content.res.ColorStateList.valueOf(getColor(R.color.ime_error))
-                button.contentDescription = getString(R.string.ime_cd_mic_retry)
-            }
-            else -> {
-                button.setImageResource(R.drawable.ic_ime_mic)
-                button.setBackgroundResource(R.drawable.ime_mic_bg)
-                button.imageTintList =
-                    android.content.res.ColorStateList.valueOf(getColor(R.color.ime_accent))
-                button.contentDescription = getString(R.string.ime_cd_mic_start)
-            }
-        }
+        uiState = uiState.copy(
+            micState = when (engineState) {
+                EngineState.LOADING -> MicVisualState.LOADING
+                EngineState.LISTENING -> MicVisualState.LISTENING
+                EngineState.FAILED -> MicVisualState.FAILED
+                else -> MicVisualState.IDLE
+            },
+            micEnabled = micEnabled(),
+        )
     }
 }

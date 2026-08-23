@@ -40,7 +40,9 @@ android {
 dependencies {
     // AndroidX base
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.savedstate)
 
     // Compose (versions managed by the BOM)
     implementation(platform(libs.androidx.compose.bom))

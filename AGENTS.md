@@ -18,12 +18,13 @@ keyboards, transcript history, cloud services.
 ## Architecture / layout
 
 - `app/src/main/kotlin/works/resolve/amanuensis/`
-  - `AmanuensisInputMethodService.kt` — the whole IME: plain-XML input view,
-    engine state machine (IDLE/LOADING/STOPPING/READY/LISTENING/FAILED), a
-    single serialized background executor for blocking Moonshine calls, and a
-    request-generation guard for stop-vs-start races.
-  - `MainActivity.kt` + `ui/setup/SetupScreen.kt` + `ui/theme/` — the Compose
-    setup flow.
+  - `AmanuensisInputMethodService.kt` — the IME host and engine state machine
+    (IDLE/LOADING/STOPPING/READY/LISTENING/FAILED), with a single serialized
+    background executor for blocking Moonshine calls and a request-generation
+    guard for stop-vs-start races. It supplies the lifecycle owners required
+    by the Compose input view.
+  - `MainActivity.kt` + `ui/setup/SetupScreen.kt` + `ui/ime/ImeKeyboard.kt` +
+    `ui/theme/` — the Compose setup flow and minimal Material 3 IME UI.
   - `MoonshineModel.kt` — shared model-cache helper: setup checks/downloads
     the model here; the IME checks presence without a blocking `load()`. The
     spec must mirror `MicTranscriber`'s defaults so both hit the same cache
@@ -31,8 +32,8 @@ keyboards, transcript history, cloud services.
   - `ime/ImePolicies.kt` — pure, unit-tested policy helpers (field
     classification incl. passwords, separator logic, enter-key decision).
     Keep new logic pure here, not in the service.
-- `app/src/main/res/` — `layout/ime_view.xml`, IME drawables/colors (light +
-  night), `xml/input_method.xml` (single en-US voice subtype).
+- `app/src/main/res/` — icons and `xml/input_method.xml` (single en-US voice
+  subtype).
 
 ## Commands
 
@@ -73,5 +74,6 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
   the one-time first-use model download.
 - **No dictation in sensitive fields.** `EditorPolicy` disables the mic and
   preview for password-type inputs; keep it that way for any new field types.
-- **IME UI stays minimal.** Plain XML view, recreated per configuration
-  change; no Fragments, Compose, or persistent state in the IME process.
+- **IME UI stays minimal.** A standalone ComposeView returned from
+  `onCreateInputView()` uses standard Material 3 components. No Fragments or
+  persistent UI state in the IME process.

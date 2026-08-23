@@ -4,10 +4,6 @@
          under edge-to-edge) matches the system light mode. -->
     <style name="Theme.Amanuensis" parent="android:Theme.Material.Light.NoActionBar" />
 
-    <!-- IME window: the theme paints the keyboard surface background so the
-         input-view root does not have to (avoids redundant overdraw). The
-         color resolves per configuration (light/night). -->
-    <style name="Theme.Amanuensis.Ime">
-        <item name="android:windowBackground">@color/ime_background</item>
-    </style>
+    <!-- Compose paints the IME surface with the Material color scheme. -->
+    <style name="Theme.Amanuensis.Ime" parent="Theme.Amanuensis" />
 </resources>
