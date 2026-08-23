@@ -7,8 +7,9 @@ is an MVP on purpose; see the hard rules before adding scope.
 
 - A voice-input IME: tap the mic, speak, text lands in the focused field as
   partial (`onText` → composing) and final (`onLine` → committed) segments.
-- A minimal Compose setup activity guiding the user through enabling the IME,
-  granting the microphone permission, and selecting the keyboard.
+- A minimal Compose setup activity guiding the user through enabling the IME
+  and granting the microphone permission (default Material 3 look, dynamic
+  system colors; no custom styling).
 - English (en-US) only, on-device recognition only.
 
 Out of scope for the MVP: settings screens, other languages, non-voice

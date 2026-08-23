@@ -11,10 +11,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,7 +27,6 @@ fun SetupScreen(
     imeEnabled: Boolean,
     micGranted: Boolean,
     onOpenImeSettings: () -> Unit,
-    onShowPicker: () -> Unit,
     onRequestMicPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -57,37 +53,29 @@ fun SetupScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        StatusCard(
-            label = stringResource(
+        Text(
+            text = stringResource(
                 R.string.setup_ime_status,
                 stringResource(if (imeEnabled) R.string.setup_status_yes else R.string.setup_status_no),
             ),
-            positive = imeEnabled,
+            style = MaterialTheme.typography.bodyLarge,
         )
-        StatusCard(
-            label = stringResource(
+        Text(
+            text = stringResource(
                 R.string.setup_permission_status,
                 stringResource(if (micGranted) R.string.setup_status_yes else R.string.setup_status_no),
             ),
-            positive = micGranted,
+            style = MaterialTheme.typography.bodyLarge,
         )
 
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (!imeEnabled) {
-                Button(onClick = onOpenImeSettings, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.setup_enable_ime))
-                }
+        if (!imeEnabled) {
+            Button(onClick = onOpenImeSettings, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.setup_enable_ime))
             }
-            OutlinedButton(onClick = onShowPicker, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.setup_open_picker))
-            }
-            if (!micGranted) {
-                Button(onClick = onRequestMicPermission, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.setup_grant_mic))
-                }
+        }
+        if (!micGranted) {
+            Button(onClick = onRequestMicPermission, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.setup_grant_mic))
             }
         }
 
@@ -101,28 +89,6 @@ fun SetupScreen(
     }
 }
 
-@Composable
-private fun StatusCard(label: String, positive: Boolean, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (positive) {
-                MaterialTheme.colorScheme.secondaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-        ),
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        )
-    }
-}
-
 @Preview(showBackground = true)
 @Composable
 private fun SetupScreenPreview() {
@@ -131,7 +97,6 @@ private fun SetupScreenPreview() {
             imeEnabled = false,
             micGranted = false,
             onOpenImeSettings = {},
-            onShowPicker = {},
             onRequestMicPermission = {},
         )
     }

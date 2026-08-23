@@ -31,7 +31,6 @@ class MainActivity : ComponentActivity() {
                     imeEnabled = imeEnabled,
                     micGranted = micGranted,
                     onOpenImeSettings = ::openImeSettings,
-                    onShowPicker = ::showInputMethodPicker,
                     onRequestMicPermission = ::requestMicPermission,
                 )
             }
@@ -50,13 +49,6 @@ class MainActivity : ComponentActivity() {
 
     private fun openImeSettings() {
         startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
-    }
-
-    private fun showInputMethodPicker() {
-        val imm = getSystemService(InputMethodManager::class.java)
-        // Conventional, safe way to show the system picker; a no-op on the
-        // rare devices where it is not supported.
-        runCatching { imm?.showInputMethodPicker() }
     }
 
     private fun requestMicPermission() {
