@@ -31,6 +31,137 @@ class TextJoiningTest {
     }
 }
 
+class CommittedLineTest {
+
+    @Test
+    fun deleteLengthJoinsTextAndSeparator() {
+        assertEquals(5, CommittedLine(textLength = 4, separatorLength = 1).deleteLength)
+        assertEquals(4, CommittedLine(textLength = 4, separatorLength = 0).deleteLength)
+    }
+}
+
+class WordDeletionTest {
+
+    @Test
+    fun nullOrEmptyDeletesNothing() {
+        assertEquals(0, WordDeletion.length(null))
+        assertEquals(0, WordDeletion.length(""))
+    }
+
+    @Test
+    fun wordTakesItsLeadingWhitespace() {
+        assertEquals(6, WordDeletion.length("Hello world")) // " world"
+    }
+
+    @Test
+    fun wordAtStartOfFieldHasNoWhitespace() {
+        assertEquals(5, WordDeletion.length("Hello"))
+    }
+
+    @Test
+    fun whitespaceRunCollapsesWithItsWord() {
+        // Trailing whitespace takes its word with it — one press, one word.
+        assertEquals(6, WordDeletion.length("Hello ")) // "Hello "
+        assertEquals(5, WordDeletion.length("one  two")) // "  two"
+    }
+
+    @Test
+    fun punctuationTravelsWithItsWord() {
+        assertEquals(6, WordDeletion.length("Hello, world")) // " world"
+        assertEquals(6, WordDeletion.length("Hello,")) // "Hello," as one unit
+    }
+
+    @Test
+    fun whitespaceOnlyFieldDeletesAllOfIt() {
+        assertEquals(3, WordDeletion.length("   "))
+    }
+
+    @Test
+    fun surrogatePairsAreNotSplit() {
+        // The word plus its leading space, emoji intact: " \uD83D\uDE00"
+        assertEquals(3, WordDeletion.length("hi \uD83D\uDE00"))
+        // A window beginning on an orphan low surrogate must spare it.
+        assertEquals(3, WordDeletion.length("\uDF06abc"))
+    }
+}
+
+class BackspaceTest {
+
+    private val line = CommittedLine(textLength = 10, separatorLength = 1)
+
+    @Test
+    fun livePartialIsDiscardedBeforeAnythingElse() {
+        val decision = Backspace.decide(
+            partialActive = true,
+            hasSelection = true,
+            lastCommitted = line,
+            cursorVerified = true,
+            textBeforeCursor = "anything",
+        )
+        assertEquals(Backspace.Decision.DiscardPartial, decision)
+    }
+
+    @Test
+    fun selectionBeatsLineRevert() {
+        val decision = Backspace.decide(
+            partialActive = false,
+            hasSelection = true,
+            lastCommitted = line,
+            cursorVerified = true,
+            textBeforeCursor = "anything",
+        )
+        assertEquals(Backspace.Decision.DeleteSelection, decision)
+    }
+
+    @Test
+    fun verifiedLineIsRevertedInOneEdit() {
+        val decision = Backspace.decide(
+            partialActive = false,
+            hasSelection = false,
+            lastCommitted = line,
+            cursorVerified = true,
+            textBeforeCursor = "anything",
+        )
+        assertEquals(Backspace.Decision.RevertLine(line.deleteLength), decision)
+    }
+
+    @Test
+    fun movedCursorFallsBackToWordDeletion() {
+        val decision = Backspace.decide(
+            partialActive = false,
+            hasSelection = false,
+            lastCommitted = line,
+            cursorVerified = false,
+            textBeforeCursor = "prior text ",
+        )
+        assertEquals(Backspace.Decision.DeleteWord(5), decision)
+    }
+
+    @Test
+    fun emptyLedgerDeletesWords() {
+        val decision = Backspace.decide(
+            partialActive = false,
+            hasSelection = false,
+            lastCommitted = null,
+            cursorVerified = true,
+            textBeforeCursor = "word",
+        )
+        assertEquals(Backspace.Decision.DeleteWord(4), decision)
+    }
+
+    @Test
+    fun nothingBeforeCursorDeletesNothing() {
+        val decision = Backspace.decide(
+            partialActive = false,
+            hasSelection = false,
+            lastCommitted = null,
+            cursorVerified = false,
+            textBeforeCursor = "",
+        )
+        assertEquals(Backspace.Decision.DeleteWord(0), decision)
+    }
+}
+
 class EditorActionsTest {
 
     @Test

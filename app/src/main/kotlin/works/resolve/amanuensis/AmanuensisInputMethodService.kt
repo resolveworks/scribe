@@ -9,6 +9,8 @@ import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.ExtractedTextRequest
+import android.view.inputmethod.InputConnection
 import ai.moonshine.voice.MicTranscriber
 import ai.moonshine.voice.TranscriptLine
 import androidx.compose.runtime.getValue
@@ -23,6 +25,8 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import works.resolve.amanuensis.ime.Backspace
+import works.resolve.amanuensis.ime.CommittedLine
 import works.resolve.amanuensis.ime.EditorActions
 import works.resolve.amanuensis.ime.TextJoining
 import works.resolve.amanuensis.ui.ime.ImeKeyboard
@@ -31,6 +35,12 @@ import works.resolve.amanuensis.ui.ime.MicVisualState
 import works.resolve.amanuensis.ui.theme.AmanuensisTheme
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+
+/** How much text before the cursor to inspect for word deletion at once. */
+private const val WORD_WINDOW_CHARS = 256
+
+/** Upper bound for the growing window, to keep the fetch bounded. */
+private const val WORD_WINDOW_MAX_CHARS = 4096
 
 /**
  * Amanuensis voice IME.
@@ -57,6 +67,19 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
 
     /** Separator for the line being dictated, until it is committed. */
     private var pendingSeparator: String? = null
+
+    /**
+     * Backspace ledger, Gboard-style: the lengths of each committed line
+     * (separator included), never the text itself. One press reverts the
+     * most recent entry while [expectedCursor] still verifies.
+     */
+    private val committedLines = ArrayDeque<CommittedLine>()
+
+    /** True while a dictated partial is set as composing text. */
+    private var partialActive = false
+
+    /** Cursor position after our last ledger edit; null when unknown. */
+    private var expectedCursor: Int? = null
 
     /** Null until the first async cache check; false re-checks, so a model downloaded in setup mid-process is picked up. */
     private var modelPresent: Boolean? = null
@@ -133,6 +156,13 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
 
     // Never take over the whole screen, in either orientation.
     override fun onEvaluateFullscreenMode(): Boolean = false
+
+    override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
+        super.onStartInput(info, restarting)
+        // A new (or restarted) field no longer matches anything we recorded.
+        forgetLedger()
+        partialActive = false
+    }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
@@ -317,6 +347,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         if (destroyed || engineState != EngineState.LISTENING) return
         val connection = currentInputConnection ?: return
         connection.setComposingText(separatorForCurrentField() + text, 1)
+        partialActive = true
     }
 
     private fun onFinalLine(line: TranscriptLine) {
@@ -325,10 +356,17 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         val text = line.text.orEmpty()
         if (text.isNotEmpty()) {
             // Replaces the composing (partial) region and commits the final line.
-            connection.commitText(separatorForCurrentField() + text, 1)
+            val separator = separatorForCurrentField()
+            connection.commitText(separator + text, 1)
+            // Ledger entry for backspace: lengths only, never the text.
+            committedLines.addLast(
+                CommittedLine(textLength = text.length, separatorLength = separator.length)
+            )
+            expectedCursor = cursorPosition(connection)
         } else {
             connection.finishComposingText()
         }
+        partialActive = false
         pendingSeparator = null
     }
 
@@ -360,20 +398,102 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
 
     // -- Editing keys --------------------------------------------------------
 
+    /**
+     * Gboard's backspace design: what this keyboard itself inserted is
+     * reverted whole — live partial first, then selection, then the last
+     * committed line — and once nothing of ours applies, deletion continues
+     * word by word through the text that was already in the field. The pure
+     * decision tree lives in [Backspace.decide].
+     */
     private fun deleteBackwards() {
         val ic = currentInputConnection ?: return
-        ic.finishComposingText()
-        if (ic.getSelectedText(0)?.isNotEmpty() == true) {
-            // commitText("") is the documented way to delete selected text.
-            ic.commitText("", 1)
-        } else {
-            // One code point per press, so surrogate pairs (emoji) go together.
-            ic.deleteSurroundingTextInCodePoints(1, 0)
+        val decision = Backspace.decide(
+            partialActive = partialActive,
+            hasSelection = !ic.getSelectedText(0).isNullOrEmpty(),
+            lastCommitted = committedLines.lastOrNull(),
+            cursorVerified = expectedCursor != null && cursorPosition(ic) == expectedCursor,
+            textBeforeCursor = textBeforeCursor(ic),
+        )
+        when (decision) {
+            Backspace.Decision.DiscardPartial -> {
+                // An empty commit replaces (removes) the composing region in
+                // one shot, discarding the whole unstable partial.
+                ic.commitText("", 1)
+                partialActive = false
+            }
+            Backspace.Decision.DeleteSelection -> {
+                // commitText("") is the documented way to delete selected text.
+                ic.commitText("", 1)
+                // The selection removed text our ledger still claims.
+                forgetLedger()
+            }
+            is Backspace.Decision.RevertLine -> {
+                ic.beginBatchEdit()
+                // Armor only: a live partial took the branch above, so there
+                // is no composing region left to finalize here.
+                ic.finishComposingText()
+                // One edit removes the line and the separator we prepended,
+                // like Gboard reverting a committed word with its separator.
+                ic.deleteSurroundingText(decision.length, 0)
+                ic.endBatchEdit()
+                committedLines.removeLast()
+                expectedCursor = expectedCursor?.minus(decision.length)
+            }
+            is Backspace.Decision.DeleteWord -> {
+                // Nothing of ours is left — or the ledger no longer matches
+                // the field — so backspace keeps going through the text that
+                // was there before our lines, one word per press.
+                forgetLedger()
+                if (decision.length > 0) {
+                    // Char lengths from the window scan, which never splits a
+                    // surrogate pair; a single edit removes the whole word.
+                    ic.deleteSurroundingText(decision.length, 0)
+                }
+            }
         }
+    }
+
+    /**
+     * Text before the cursor, fetched in growing windows until a fetch comes
+     * back shorter than requested (the start of the field was reached), so a
+     * word longer than one window is still measured whole — the same walk
+     * LatinIME's `deleteWord` does.
+     */
+    private fun textBeforeCursor(ic: InputConnection): CharSequence? {
+        var window = WORD_WINDOW_CHARS
+        while (true) {
+            val text = ic.getTextBeforeCursor(window, 0) ?: return null
+            if (text.length < window || window >= WORD_WINDOW_MAX_CHARS) return text
+            window *= 2
+        }
+    }
+
+    /** Drops all backspace history: it no longer matches the field. */
+    private fun forgetLedger() {
+        committedLines.clear()
+        expectedCursor = null
+    }
+
+    /**
+     * The absolute cursor position, or null when the editor will not tell us
+     * (no extracted text, or a selection). This is the ledger's Google-style
+     * verification: after each committed line we record where our edit left
+     * the cursor, and backspace may only revert history while it is still
+     * there. Anything else means the user or the app changed the field.
+     */
+    private fun cursorPosition(ic: InputConnection): Int? {
+        val extracted = ic.getExtractedText(ExtractedTextRequest(), 0) ?: return null
+        if (extracted.selectionStart < 0 || extracted.selectionStart != extracted.selectionEnd) {
+            return null
+        }
+        return extracted.startOffset + extracted.selectionEnd
     }
 
     private fun performEnter() {
         val ic = currentInputConnection ?: return
+        // The app inserts (or acts on) the newline itself, so our recorded
+        // lengths and cursor position no longer describe the field.
+        forgetLedger()
         val info = currentInputEditorInfo
         val decision = EditorActions.decide(info?.actionId ?: 0, info?.actionLabel, info?.imeOptions ?: 0)
         when (decision) {
