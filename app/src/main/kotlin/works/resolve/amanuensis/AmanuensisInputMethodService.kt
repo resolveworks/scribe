@@ -120,6 +120,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                 AmanuensisTheme {
                     ImeKeyboard(
                         state = uiState,
+                        onBack = ::switchToPreviousKeyboard,
                         onDelete = ::deleteBackwards,
                         onMicClick = ::onMicClicked,
                         onEnter = ::performEnter,
@@ -342,6 +343,17 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         engineState = EngineState.FAILED
         setStatus(getString(R.string.ime_status_failed))
         refreshMicButton()
+    }
+
+    // -- Keyboard switch ----------------------------------------------------
+
+    /**
+     * Returns to the keyboard the user switched here from. The framework's
+     * usual finish/hide callbacks then stop dictation, exactly as when the
+     * system's own IME switcher is used.
+     */
+    private fun switchToPreviousKeyboard() {
+        switchToPreviousInputMethod()
     }
 
     // -- Editing keys --------------------------------------------------------

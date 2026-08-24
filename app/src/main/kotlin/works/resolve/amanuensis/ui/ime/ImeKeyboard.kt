@@ -11,6 +11,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,6 +44,7 @@ internal data class ImeUiState(
 @Composable
 internal fun ImeKeyboard(
     state: ImeUiState,
+    onBack: () -> Unit,
     onDelete: () -> Unit,
     onMicClick: () -> Unit,
     onEnter: () -> Unit,
@@ -54,28 +56,39 @@ internal fun ImeKeyboard(
         // owns the only structural spacing — navigationBarsPadding lifts the
         // content above the edge-to-edge nav bar (the surface color still
         // paints behind it) — and the controls get modest vertical padding.
-        // A status line, when shown, simply grows the keyboard by one line,
-        // the way a candidates view does.
+        // The back key anchors the top-left; a status line, when shown, fills
+        // the rest of that header row to its right.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(horizontal = 16.dp),
         ) {
-            if (state.status.isNotBlank()) {
-                Text(
-                    text = state.status,
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_ime_back),
+                        contentDescription = stringResource(R.string.ime_cd_back),
+                    )
+                }
+                if (state.status.isNotBlank()) {
+                    Text(
+                        text = state.status,
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 24.dp),
+                    .padding(vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 KeyboardKey(
@@ -171,6 +184,7 @@ private fun ImeKeyboardPreview() {
                 micState = MicVisualState.FAILED,
                 micEnabled = true,
             ),
+            onBack = {},
             onDelete = {},
             onMicClick = {},
             onEnter = {},

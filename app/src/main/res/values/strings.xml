@@ -16,6 +16,7 @@
     <string name="setup_download_failed">Download failed. Try again.</string>
 
     <string name="ime_subtype_voice_en">English (voice)</string>
+    <string name="ime_cd_back">Back to previous keyboard</string>
     <string name="ime_cd_mic_start">Start voice dictation</string>
     <string name="ime_cd_mic_stop">Stop voice dictation</string>
     <string name="ime_cd_mic_retry">Retry starting voice dictation</string>
