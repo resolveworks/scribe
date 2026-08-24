@@ -80,7 +80,7 @@ fun SetupScreen(
                     R.string.setup_ime_status,
                     stringResource(if (imeEnabled) R.string.setup_status_yes else R.string.setup_status_no),
                 ),
-                iconRes = R.drawable.ic_ime_keyboard,
+                iconRes = R.drawable.keyboard_24,
                 done = imeEnabled,
             )
 
@@ -90,7 +90,7 @@ fun SetupScreen(
                     R.string.setup_permission_status,
                     stringResource(if (micGranted) R.string.setup_status_yes else R.string.setup_status_no),
                 ),
-                iconRes = R.drawable.ic_ime_mic,
+                iconRes = R.drawable.mic_24,
                 done = micGranted,
             )
 
@@ -108,7 +108,7 @@ fun SetupScreen(
                         stringResource(R.string.setup_status_no),
                     )
                 },
-                iconRes = R.drawable.ic_download,
+                iconRes = R.drawable.download_24,
                 done = modelState == ModelState.DOWNLOADED,
             )
 
@@ -185,7 +185,7 @@ private fun SetupStep(
         trailingContent = if (done) {
             {
                 Icon(
-                    painter = painterResource(R.drawable.ic_check),
+                    painter = painterResource(R.drawable.check_24),
                     // Status is already stated by the supporting text.
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,

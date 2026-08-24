@@ -72,7 +72,7 @@ internal fun ImeKeyboard(
             ) {
                 IconButton(onClick = onBack) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_ime_back),
+                        painter = painterResource(R.drawable.arrow_back_24),
                         contentDescription = stringResource(R.string.ime_cd_back),
                     )
                 }
@@ -159,7 +159,7 @@ private fun MicControl(state: ImeUiState, onClick: () -> Unit) {
     ) {
         Icon(
             painter = painterResource(
-                if (listening) R.drawable.ic_ime_stop else R.drawable.ic_ime_mic
+                if (listening) R.drawable.mic_off_24 else R.drawable.mic_24
             ),
             contentDescription = description,
         )
