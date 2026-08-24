@@ -23,8 +23,6 @@
     <string name="ime_cd_loading">Preparing voice dictation</string>
     <string name="ime_cd_delete">Delete</string>
     <string name="ime_cd_enter">Enter</string>
-    <string name="ime_key_delete">⌫</string>
-    <string name="ime_key_enter">⏎</string>
     <string name="ime_status_model_missing">Finish setup to download the speech model</string>
     <string name="ime_status_permission_missing">Finish setup to allow the microphone</string>
     <string name="ime_status_failed">Something went wrong. Tap to retry.</string>

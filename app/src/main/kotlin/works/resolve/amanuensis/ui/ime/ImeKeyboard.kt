@@ -1,5 +1,6 @@
 package works.resolve.amanuensis.ui.ime
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -92,7 +92,7 @@ internal fun ImeKeyboard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 KeyboardKey(
-                    label = stringResource(R.string.ime_key_delete),
+                    iconRes = R.drawable.backspace_24,
                     description = stringResource(R.string.ime_cd_delete),
                     onClick = onDelete,
                     modifier = Modifier.weight(1f),
@@ -105,7 +105,7 @@ internal fun ImeKeyboard(
                     MicControl(state, onMicClick)
                 }
                 KeyboardKey(
-                    label = stringResource(R.string.ime_key_enter),
+                    iconRes = R.drawable.keyboard_return_24,
                     description = stringResource(R.string.ime_cd_enter),
                     onClick = onEnter,
                     modifier = Modifier.weight(1f),
@@ -118,21 +118,17 @@ internal fun ImeKeyboard(
 
 @Composable
 private fun KeyboardKey(
-    label: String,
+    @DrawableRes iconRes: Int,
     description: String,
     onClick: () -> Unit,
     modifier: Modifier,
     alignment: Alignment,
 ) {
     Box(modifier = modifier, contentAlignment = alignment) {
-        FilledTonalIconButton(
-            onClick = onClick,
-            modifier = Modifier.semantics { contentDescription = description },
-        ) {
-            Text(
-                text = label,
-                modifier = Modifier.clearAndSetSemantics { },
-                style = MaterialTheme.typography.titleLarge,
+        FilledTonalIconButton(onClick = onClick) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = description,
             )
         }
     }
