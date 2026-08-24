@@ -140,7 +140,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
             // The model may have been downloaded in setup since the last look.
             checkModel()
         }
-        stopDictation()
         refreshStatus()
         refreshMicButton()
         maybeAutoStartDictation()
@@ -149,6 +148,10 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
     override fun onFinishInputView(finishingInput: Boolean) {
         stopDictation()
         super.onFinishInputView(finishingInput)
+        // isAuxiliary keeps this voice subtype out of IME history, but does
+        // not restore the previous keyboard by itself. Return while this
+        // service's IME token is still valid, before the window is hidden.
+        switchToPreviousInputMethod()
     }
 
     override fun onWindowShown() {
@@ -158,7 +161,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
     }
 
     override fun onWindowHidden() {
-        stopDictation()
         super.onWindowHidden()
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
     }
