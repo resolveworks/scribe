@@ -1,6 +1,7 @@
 package works.resolve.amanuensis.ui.ime
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -62,6 +63,7 @@ internal fun ImeKeyboard(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
+                .padding(bottom = 48.dp) // mirror the header row's height below the keys
                 .padding(horizontal = 16.dp),
         ) {
             Row(
@@ -85,31 +87,26 @@ internal fun ImeKeyboard(
                     )
                 }
             }
+            // The delete–mic–enter cluster is centered as one group, with
+            // wide gaps so the side keys reach toward thumb range without
+            // pinning to the screen edges.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(48.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 KeyboardKey(
                     iconRes = R.drawable.backspace_24,
                     description = stringResource(R.string.ime_cd_delete),
                     onClick = onDelete,
-                    modifier = Modifier.weight(1f),
-                    alignment = Alignment.CenterStart,
                 )
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    MicControl(state, onMicClick)
-                }
+                MicControl(state, onMicClick)
                 KeyboardKey(
                     iconRes = R.drawable.keyboard_return_24,
                     description = stringResource(R.string.ime_cd_enter),
                     onClick = onEnter,
-                    modifier = Modifier.weight(1f),
-                    alignment = Alignment.CenterEnd,
                 )
             }
         }
@@ -121,16 +118,15 @@ private fun KeyboardKey(
     @DrawableRes iconRes: Int,
     description: String,
     onClick: () -> Unit,
-    modifier: Modifier,
-    alignment: Alignment,
 ) {
-    Box(modifier = modifier, contentAlignment = alignment) {
-        FilledTonalIconButton(onClick = onClick) {
-            Icon(
-                painter = painterResource(iconRes),
-                contentDescription = description,
-            )
-        }
+    FilledTonalIconButton(
+        onClick = onClick,
+        modifier = Modifier.size(56.dp),
+    ) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = description,
+        )
     }
 }
 
@@ -138,10 +134,10 @@ private fun KeyboardKey(
 private fun MicControl(state: ImeUiState, onClick: () -> Unit) {
     if (state.micState == MicVisualState.LOADING) {
         val loadingDescription = stringResource(R.string.ime_cd_loading)
-        Box(modifier = Modifier.size(64.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(44.dp)
                     .semantics { contentDescription = loadingDescription },
             )
         }
@@ -159,7 +155,7 @@ private fun MicControl(state: ImeUiState, onClick: () -> Unit) {
     FilledIconButton(
         onClick = onClick,
         enabled = state.micEnabled,
-        modifier = Modifier.size(64.dp),
+        modifier = Modifier.size(72.dp),
     ) {
         Icon(
             painter = painterResource(
