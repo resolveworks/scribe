@@ -84,7 +84,7 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
     /** Null until the first async cache check; false re-checks, so a model downloaded in setup mid-process is picked up. */
     private var modelPresent: Boolean? = null
 
-    /** Guards against repeatedly pushing the setup screen over the host app. */
+    /** True once setup has been pushed over the host app; a prerequisite still missing after that returns the user to their previous keyboard. */
     private var setupPromptShown = false
 
     // ComposeView needs owners when it is hosted outside an Activity or
@@ -128,7 +128,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
 
     override fun onCreateInputView(): View {
         inputComposeView?.disposeComposition()
-        refreshStatus()
         refreshMicButton()
         // A window Recomposer looks up its owners from the IME window's root,
         // not only from the returned input view, so install them on both.
@@ -166,11 +165,11 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        if (modelPresent != true) {
+        when {
             // The model may have been downloaded in setup since the last look.
-            checkModel()
+            modelPresent != true -> checkModel()
+            !micPermissionGranted() -> handlePrerequisiteMissing()
         }
-        refreshStatus()
         refreshMicButton()
         maybeAutoStartDictation()
     }
@@ -197,19 +196,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
 
     // -- Field handling ------------------------------------------------------
 
-    private fun refreshStatus() {
-        when {
-            modelPresent == false ->
-                setStatus(getString(R.string.ime_status_model_missing))
-            !micPermissionGranted() ->
-                setStatus(getString(R.string.ime_status_permission_missing))
-            engineState == EngineState.FAILED ->
-                setStatus(getString(R.string.ime_status_failed))
-            // LOADING/STOPPING show no status; the mic button's loader covers them.
-            else -> setStatus("")
-        }
-    }
-
     private fun micEnabled(): Boolean =
         engineState != EngineState.LOADING &&
             engineState != EngineState.STOPPING
@@ -235,14 +221,28 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
             main.post {
                 if (destroyed) return@post
                 modelPresent = present
-                if (!present && !setupPromptShown) {
-                    setupPromptShown = true
-                    openSetupScreen()
+                if (!present || !micPermissionGranted()) {
+                    handlePrerequisiteMissing()
+                } else {
+                    maybeAutoStartDictation()
                 }
-                refreshStatus()
                 refreshMicButton()
-                maybeAutoStartDictation()
             }
+        }
+    }
+
+    /**
+     * A setup-fixable prerequisite (model or microphone permission) is
+     * missing. The first time, setup is pushed at the point of use; if the
+     * user already saw setup and came back without fixing things, silently
+     * return to their previous keyboard.
+     */
+    private fun handlePrerequisiteMissing() {
+        if (!setupPromptShown) {
+            setupPromptShown = true
+            openSetupScreen()
+        } else {
+            switchToPreviousKeyboard()
         }
     }
 
@@ -270,7 +270,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         if (currentInputConnection == null) return
         pendingSeparator = null
         engineState = EngineState.LOADING
-        setStatus("") // Any previous status line is cleared; the loader shows loading.
         refreshMicButton()
         // load()/start() block; keep them off the main thread, serialized on the worker.
         worker.execute {
@@ -292,7 +291,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
             main.post {
                 if (!destroyed && engineState == EngineState.LOADING) {
                     engineState = EngineState.LISTENING
-                    setStatus("")
                     refreshMicButton()
                 }
                 // Else a queued mic.stop() already follows on the worker.
@@ -306,7 +304,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                 return@post
             }
             engineState = EngineState.FAILED
-            setStatus(getString(R.string.ime_status_failed))
             refreshMicButton()
         }
     }
@@ -315,7 +312,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         when (engineState) {
             EngineState.LISTENING -> {
                 engineState = EngineState.IDLE
-                setStatus("")
                 refreshMicButton()
                 // onFinalLine still accepts the trailing final posted after stop().
                 mic?.stop()
@@ -325,7 +321,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                 // the in-flight worker job or start would undo it.
                 engineState = EngineState.STOPPING
                 pendingSeparator = null
-                setStatus("")
                 refreshMicButton()
                 worker.execute {
                     mic?.stop()
@@ -333,7 +328,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
                         if (!destroyed && engineState == EngineState.STOPPING) {
                             engineState = EngineState.IDLE
                             refreshMicButton()
-                            refreshStatus()
                             maybeAutoStartDictation()
                         }
                     }
@@ -381,7 +375,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         if (destroyed) return
         if (engineState != EngineState.LISTENING && engineState != EngineState.LOADING) return
         engineState = EngineState.FAILED
-        setStatus(getString(R.string.ime_status_failed))
         refreshMicButton()
     }
 
@@ -506,10 +499,6 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
     }
 
     // -- UI ------------------------------------------------------------------
-
-    private fun setStatus(text: String) {
-        uiState = uiState.copy(status = text)
-    }
 
     private fun refreshMicButton() {
         uiState = uiState.copy(

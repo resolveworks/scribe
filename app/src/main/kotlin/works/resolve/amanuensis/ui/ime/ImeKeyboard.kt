@@ -14,9 +14,7 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
@@ -25,7 +23,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import works.resolve.amanuensis.R
@@ -33,10 +30,9 @@ import works.resolve.amanuensis.ui.theme.AmanuensisTheme
 
 internal enum class MicVisualState { IDLE, LOADING, LISTENING, FAILED }
 
-/** One-line hint; rendered only while non-blank. */
+/** Visual state of the IME controls, hosted by the service. */
 @Immutable
 internal data class ImeUiState(
-    val status: String = "",
     val micState: MicVisualState = MicVisualState.IDLE,
     val micEnabled: Boolean = false,
 )
@@ -57,35 +53,19 @@ internal fun ImeKeyboard(
         // owns the only structural spacing — navigationBarsPadding lifts the
         // content above the edge-to-edge nav bar (the surface color still
         // paints behind it) — and the controls get modest vertical padding.
-        // The back key anchors the top-left; a status line, when shown, fills
-        // the rest of that header row to its right.
+        // The back key anchors the top-left.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(bottom = 48.dp) // mirror the header row's height below the keys
+                .padding(bottom = 48.dp) // mirror the back key's height below the keys
                 .padding(horizontal = 16.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        painter = painterResource(R.drawable.arrow_back_24),
-                        contentDescription = stringResource(R.string.ime_cd_back),
-                    )
-                }
-                if (state.status.isNotBlank()) {
-                    Text(
-                        text = state.status,
-                        modifier = Modifier.weight(1f),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+            IconButton(onClick = onBack) {
+                Icon(
+                    painter = painterResource(R.drawable.arrow_back_24),
+                    contentDescription = stringResource(R.string.ime_cd_back),
+                )
             }
             // The delete–mic–enter cluster is centered as one group, with
             // wide gaps so the side keys reach toward thumb range without
@@ -159,9 +139,14 @@ private fun MicControl(state: ImeUiState, onClick: () -> Unit) {
     ) {
         Icon(
             painter = painterResource(
-                if (listening) R.drawable.mic_off_24 else R.drawable.mic_24
+                when {
+                    listening -> R.drawable.mic_off_24
+                    state.micState == MicVisualState.FAILED -> R.drawable.mic_alert_24
+                    else -> R.drawable.mic_24
+                }
             ),
             contentDescription = description,
+            modifier = Modifier.size(32.dp),
         )
     }
 }
@@ -172,7 +157,6 @@ private fun ImeKeyboardPreview() {
     AmanuensisTheme {
         ImeKeyboard(
             state = ImeUiState(
-                status = "Something went wrong. Tap to retry.",
                 micState = MicVisualState.FAILED,
                 micEnabled = true,
             ),
