@@ -9,7 +9,7 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Amanuensis">
+        android:theme="@style/Theme.Scribe">
 
         <activity
             android:name=".MainActivity"
@@ -21,10 +21,10 @@
         </activity>
 
         <service
-            android:name=".AmanuensisInputMethodService"
+            android:name=".ScribeInputMethodService"
             android:exported="true"
             android:label="@string/ime_name"
-            android:theme="@style/Theme.Amanuensis.Ime"
+            android:theme="@style/Theme.Scribe.Ime"
             android:permission="android.permission.BIND_INPUT_METHOD">
             <intent-filter>
                 <action android:name="android.view.InputMethod" />

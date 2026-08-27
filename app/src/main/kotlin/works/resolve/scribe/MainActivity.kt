@@ -1,4 +1,4 @@
-package works.resolve.amanuensis
+package works.resolve.scribe
 
 import android.Manifest
 import android.content.Context
@@ -14,9 +14,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import works.resolve.amanuensis.ui.setup.ModelState
-import works.resolve.amanuensis.ui.setup.SetupScreen
-import works.resolve.amanuensis.ui.theme.AmanuensisTheme
+import works.resolve.scribe.ui.setup.ModelState
+import works.resolve.scribe.ui.setup.SetupScreen
+import works.resolve.scribe.ui.theme.ScribeTheme
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
         refreshState()
 
         setContent {
-            AmanuensisTheme {
+            ScribeTheme {
                 SetupScreen(
                     imeEnabled = imeEnabled,
                     micGranted = micGranted,

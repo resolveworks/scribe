@@ -2,8 +2,8 @@
     <!-- Compose-only app: minimal platform theme, real theming lives in Compose.
          Light parent so the pre-Compose window (and status-bar icon appearance
          under edge-to-edge) matches the system light mode. -->
-    <style name="Theme.Amanuensis" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Scribe" parent="android:Theme.Material.Light.NoActionBar" />
 
     <!-- Compose paints the IME surface with the Material color scheme. -->
-    <style name="Theme.Amanuensis.Ime" parent="Theme.Amanuensis" />
+    <style name="Theme.Scribe.Ime" parent="Theme.Scribe" />
 </resources>

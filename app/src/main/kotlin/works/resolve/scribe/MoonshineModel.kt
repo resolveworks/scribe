@@ -1,4 +1,4 @@
-package works.resolve.amanuensis
+package works.resolve.scribe
 
 import ai.moonshine.voice.AssetDownloader
 import ai.moonshine.voice.JNI

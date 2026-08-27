@@ -1,4 +1,4 @@
-package works.resolve.amanuensis.ui.ime
+package works.resolve.scribe.ui.ime
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
@@ -25,8 +25,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import works.resolve.amanuensis.R
-import works.resolve.amanuensis.ui.theme.AmanuensisTheme
+import works.resolve.scribe.R
+import works.resolve.scribe.ui.theme.ScribeTheme
 
 internal enum class MicVisualState { IDLE, LOADING, LISTENING, FAILED }
 
@@ -154,7 +154,7 @@ private fun MicControl(state: ImeUiState, onClick: () -> Unit) {
 @Preview(showBackground = true)
 @Composable
 private fun ImeKeyboardPreview() {
-    AmanuensisTheme {
+    ScribeTheme {
         ImeKeyboard(
             state = ImeUiState(
                 micState = MicVisualState.FAILED,

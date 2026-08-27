@@ -1,4 +1,4 @@
-package works.resolve.amanuensis
+package works.resolve.scribe
 
 import android.Manifest
 import android.content.Intent
@@ -25,14 +25,14 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import works.resolve.amanuensis.ime.Backspace
-import works.resolve.amanuensis.ime.CommittedLine
-import works.resolve.amanuensis.ime.EditorActions
-import works.resolve.amanuensis.ime.TextJoining
-import works.resolve.amanuensis.ui.ime.ImeKeyboard
-import works.resolve.amanuensis.ui.ime.ImeUiState
-import works.resolve.amanuensis.ui.ime.MicVisualState
-import works.resolve.amanuensis.ui.theme.AmanuensisTheme
+import works.resolve.scribe.ime.Backspace
+import works.resolve.scribe.ime.CommittedLine
+import works.resolve.scribe.ime.EditorActions
+import works.resolve.scribe.ime.TextJoining
+import works.resolve.scribe.ui.ime.ImeKeyboard
+import works.resolve.scribe.ui.ime.ImeUiState
+import works.resolve.scribe.ui.ime.MicVisualState
+import works.resolve.scribe.ui.theme.ScribeTheme
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -43,7 +43,7 @@ private const val WORD_WINDOW_CHARS = 256
 private const val WORD_WINDOW_MAX_CHARS = 4096
 
 /**
- * Amanuensis voice IME.
+ * Scribe voice IME.
  *
  * Moonshine usage follows the binding's contract: construction is cheap, the
  * blocking [MicTranscriber.load] / [MicTranscriber.start] run on one
@@ -51,7 +51,7 @@ private const val WORD_WINDOW_MAX_CHARS = 4096
  * (composing text), `onLine` as a finished line (committed text), and the
  * model stays loaded and reusable while the service lives.
  */
-class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
+class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
 
     private enum class EngineState { IDLE, LOADING, STOPPING, LISTENING, FAILED }
 
@@ -132,14 +132,14 @@ class AmanuensisInputMethodService : InputMethodService(), LifecycleOwner, Saved
         // A window Recomposer looks up its owners from the IME window's root,
         // not only from the returned input view, so install them on both.
         window?.window?.decorView?.apply {
-            setViewTreeLifecycleOwner(this@AmanuensisInputMethodService)
-            setViewTreeSavedStateRegistryOwner(this@AmanuensisInputMethodService)
+            setViewTreeLifecycleOwner(this@ScribeInputMethodService)
+            setViewTreeSavedStateRegistryOwner(this@ScribeInputMethodService)
         }
         return ComposeView(this).apply {
-            setViewTreeLifecycleOwner(this@AmanuensisInputMethodService)
-            setViewTreeSavedStateRegistryOwner(this@AmanuensisInputMethodService)
+            setViewTreeLifecycleOwner(this@ScribeInputMethodService)
+            setViewTreeSavedStateRegistryOwner(this@ScribeInputMethodService)
             setContent {
-                AmanuensisTheme {
+                ScribeTheme {
                     ImeKeyboard(
                         state = uiState,
                         onBack = ::switchToPreviousKeyboard,

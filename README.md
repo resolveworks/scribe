@@ -1,6 +1,6 @@
-# Amanuensis
+# Scribe
 
-Amanuensis is a voice keyboard for Android. Instead of typing, you tap the
+Scribe is a voice keyboard for Android. Instead of typing, you tap the
 microphone, speak, and your words appear as text in any app — with all speech
 recognition running entirely on your device.
 
@@ -26,9 +26,9 @@ an on-device speech recognition toolkit.
 ## Setup
 
 1. Install the app and open it.
-2. Follow the setup screen: enable **Amanuensis** in system input-method
+2. Follow the setup screen: enable **Scribe** in system input-method
    settings, grant microphone access, and select it as your keyboard.
-3. In any app's text field, switch to Amanuensis and tap the microphone.
+3. In any app's text field, switch to Scribe and tap the microphone.
 
 The first dictation downloads the speech recognition model, so it needs an
 internet connection that one time. After that, recognition works fully

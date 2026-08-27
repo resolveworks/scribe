@@ -1,4 +1,4 @@
-package works.resolve.amanuensis.ui.setup
+package works.resolve.scribe.ui.setup
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
@@ -25,8 +25,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import works.resolve.amanuensis.R
-import works.resolve.amanuensis.ui.theme.AmanuensisTheme
+import works.resolve.scribe.R
+import works.resolve.scribe.ui.theme.ScribeTheme
 
 /** Setup state of the speech-model download, driven by [MainActivity]. */
 enum class ModelState { NOT_DOWNLOADED, DOWNLOADING, DOWNLOADED, FAILED }
@@ -200,7 +200,7 @@ private fun SetupStep(
 @Preview(showBackground = true)
 @Composable
 private fun SetupScreenPreview() {
-    AmanuensisTheme {
+    ScribeTheme {
         SetupScreen(
             imeEnabled = false,
             micGranted = false,
@@ -216,7 +216,7 @@ private fun SetupScreenPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun SetupScreenDownloadingPreview() {
-    AmanuensisTheme {
+    ScribeTheme {
         SetupScreen(
             imeEnabled = true,
             micGranted = true,
@@ -232,7 +232,7 @@ private fun SetupScreenDownloadingPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun SetupScreenAllSetPreview() {
-    AmanuensisTheme {
+    ScribeTheme {
         SetupScreen(
             imeEnabled = true,
             micGranted = true,

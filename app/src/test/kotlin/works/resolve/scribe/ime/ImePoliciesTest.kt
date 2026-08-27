@@ -1,7 +1,7 @@
-package works.resolve.amanuensis.ime
+package works.resolve.scribe.ime
 
 import android.view.inputmethod.EditorInfo
-import works.resolve.amanuensis.ime.EditorActions.Decision
+import works.resolve.scribe.ime.EditorActions.Decision
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

@@ -5,12 +5,12 @@ plugins {
 }
 
 android {
-    namespace = "works.resolve.amanuensis"
+    namespace = "works.resolve.scribe"
     compileSdk = 37
     buildToolsVersion = "37.0.0"
 
     defaultConfig {
-        applicationId = "works.resolve.amanuensis"
+        applicationId = "works.resolve.scribe"
         minSdk = 37
         targetSdk = 37
         versionCode = 1

@@ -1,4 +1,4 @@
 <resources>
-    <!-- Dark counterpart of Theme.Amanuensis for night mode. -->
-    <style name="Theme.Amanuensis" parent="android:Theme.Material.NoActionBar" />
+    <!-- Dark counterpart of Theme.Scribe for night mode. -->
+    <style name="Theme.Scribe" parent="android:Theme.Material.NoActionBar" />
 </resources>

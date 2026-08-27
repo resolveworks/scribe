@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "amanuensis"
+rootProject.name = "scribe"
 include(":app")

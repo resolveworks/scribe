@@ -1,4 +1,4 @@
-package works.resolve.amanuensis.ime
+package works.resolve.scribe.ime
 
 import android.view.inputmethod.EditorInfo
 

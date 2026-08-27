@@ -1,4 +1,4 @@
-# Amanuensis
+# Scribe
 
 A privacy-first Android voice keyboard (IME) built on Moonshine Voice. This
 is an MVP on purpose; see the hard rules before adding scope.
@@ -17,8 +17,8 @@ keyboards, transcript history, cloud services.
 
 ## Architecture / layout
 
-- `app/src/main/kotlin/works/resolve/amanuensis/`
-  - `AmanuensisInputMethodService.kt` — the IME host and engine state machine
+- `app/src/main/kotlin/works/resolve/scribe/`
+  - `ScribeInputMethodService.kt` — the IME host and engine state machine
     (IDLE/LOADING/STOPPING/LISTENING/FAILED), with a single serialized
     background executor for blocking Moonshine calls and a STOPPING barrier
     for stop-vs-start races. It supplies the lifecycle owners required

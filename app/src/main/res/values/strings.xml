@@ -1,8 +1,8 @@
 <resources>
-    <string name="app_name">Amanuensis</string>
-    <string name="ime_name">Amanuensis</string>
+    <string name="app_name">Scribe</string>
+    <string name="ime_name">Scribe</string>
 
-    <string name="setup_title">Set up Amanuensis</string>
+    <string name="setup_title">Set up Scribe</string>
     <string name="setup_body">An on-device voice keyboard. Your speech never leaves this device.</string>
     <string name="setup_ime_status">Keyboard enabled: %1$s</string>
     <string name="setup_permission_status">Microphone access: %1$s</string>
