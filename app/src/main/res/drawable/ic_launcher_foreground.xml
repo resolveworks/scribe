@@ -1,26 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Launcher foreground: plain microphone motif, white strokes so the
-     adaptive-icon (and monochrome) tint works. Centered in the 66dp safe
-     zone of the 108dp adaptive-icon canvas. -->
+<!-- A pair of quotation marks representing the user's own words. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Capsule -->
-    <path
-        android:pathData="M54,36a9,9 0 0 1 9,9v11a9,9 0 0 1 -18,0v-11a9,9 0 0 1 9,-9z"
-        android:strokeWidth="5"
-        android:strokeColor="#FFFFFF" />
-    <!-- Cradle -->
-    <path
-        android:pathData="M40,50a14,14 0 0 0 28,0"
-        android:strokeWidth="5"
-        android:strokeColor="#FFFFFF" />
-    <!-- Stem and base -->
-    <path
-        android:pathData="M54,64v7M45,74h18"
-        android:strokeWidth="5"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round" />
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:translateX="4"
+        android:translateY="-1"
+        android:scaleX="0.72"
+        android:scaleY="0.72">
+        <path
+            android:fillColor="#000000"
+            android:pathData="M31,36h5c6,0 10,4 10,10v8c0,12 -6,22 -17,27l-5,-8c7,-4 10,-8 10,-14h-3c-6,0 -10,-4 -10,-10v-3c0,-6 4,-10 10,-10zM62,36h5c6,0 10,4 10,10v8c0,12 -6,22 -17,27l-5,-8c7,-4 10,-8 10,-14h-3c-6,0 -10,-4 -10,-10v-3c0,-6 4,-10 10,-10z" />
+    </group>
 </vector>
