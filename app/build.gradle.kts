@@ -51,7 +51,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // On-device speech recognition (MicTranscriber, used by the IME)
+    // On-device speech recognition (base Transcriber, driven by DictationEngine)
     implementation(libs.moonshine.voice)
 
     // Unit tests
