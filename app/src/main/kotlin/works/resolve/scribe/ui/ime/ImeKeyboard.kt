@@ -135,7 +135,7 @@ private fun MicControl(state: DictationState, level: Float, onClick: () -> Unit)
         animationSpec = tween(durationMillis = 100),
         label = "micHaloLevel",
     )
-    val haloRadius = (40 + 56 * haloLevel).dp
+    val haloRadius = (40 + 28 * haloLevel).dp
     Box {
         Canvas(modifier = Modifier.size(72.dp)) {
             drawCircle(color = haloColor, radius = haloRadius.toPx())
