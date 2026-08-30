@@ -184,22 +184,28 @@ internal class DictationEngine(
                 main.post { onLevel(level) }
                 // Lossless: the queue is unbounded, so inference lag slows
                 // nothing on the mic side and drops no audio.
-                queue.put(floats)
+                queue.offer(floats)
             }
         } catch (_: Throwable) {
             main.post(onError)
         } finally {
-            recorder?.let {
-                // Stop the hardware before releasing; both on our thread.
-                try {
-                    it.stop()
-                } catch (_: Throwable) {
-                    // Never started, or already stopped — release either way.
+            try {
+                recorder?.let {
+                    // Stop the hardware before releasing; both on our thread.
+                    try {
+                        it.stop()
+                    } catch (_: Throwable) {
+                        // Never started, or already stopped — release either way.
+                    }
+                    it.release()
                 }
-                it.release()
+            } finally {
+                // The session's end-of-stream marker, after any last audio —
+                // the outermost finally action, so it is enqueued no matter
+                // what teardown above threw. Non-blocking: the queue is
+                // unbounded, so add() always succeeds.
+                queue.add(END_OF_STREAM)
             }
-            // The session's end-of-stream marker, after any last audio.
-            queue.put(END_OF_STREAM)
         }
     }
 
