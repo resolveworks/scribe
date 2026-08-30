@@ -1,66 +1,55 @@
 # Scribe
 
-Scribe is a voice keyboard for Android. Instead of typing, you tap the
-microphone, speak, and your words appear as text in any app — with all speech
-recognition running entirely on your device.
+Scribe is a small, privacy-first voice input keyboard for Android. I wrote it
+mostly for personal use because I wanted a good voice keyboard for the latest
+GrapheneOS.
 
-It is powered by [Moonshine Voice](https://moonshine-voice.readthedocs.io),
-an on-device speech recognition toolkit.
+When Scribe is selected, it listens while the keyboard is visible and inserts
+speech into the focused text field. Partial results appear as composing text;
+finished lines are committed automatically.
 
-## Features
+Speech recognition is provided by
+[Moonshine Voice](https://moonshine-voice.readthedocs.io) and runs entirely on
+the device.
 
-- Voice dictation into any text field, via Android's standard input-method
-  (keyboard) mechanism. You decide where to dictate — no field type is
-  blocked.
-- Live partial transcription while you speak; each finished speech segment is
-  committed as final text.
-- Basic editing keys: delete, enter, and switch back to your previous
-  keyboard.
-- On-device recognition: your speech never leaves the device, and nothing is
-  recorded, stored, or uploaded.
+## Current scope
 
-## Requirements
+- English (en-US) dictation
+- Live partial transcription
+- Delete, enter, and return-to-previous-keyboard controls
+- Android API 37 only
+- No settings, history, cloud services, or conventional keyboard
 
-- Android 17 (API 37) or newer. Older versions are not supported.
+This is an intentionally minimal, personal-use project rather than a polished
+general-purpose keyboard.
 
 ## Setup
 
-1. Install the app and open it.
-2. Follow the setup screen: enable **Scribe** in system input-method
-   settings, grant microphone access, and select it as your keyboard.
-3. In any app's text field, switch to Scribe and tap the microphone.
+1. Install and open Scribe.
+2. Enable it in Android's keyboard settings.
+3. Grant microphone permission.
+4. Download the speech model from the setup screen.
+5. Select Scribe as the current keyboard and start speaking.
 
-The first dictation downloads the speech recognition model, so it needs an
-internet connection that one time. After that, recognition works fully
-offline.
+An internet connection is needed only to download the model. Afterward,
+recognition works offline.
 
 ## Privacy
 
-All speech recognition runs locally on the device. Audio and transcripts are
-never logged, stored, or sent anywhere. The app's internet permission is used
-only for the initial model download.
+Audio and transcripts are never logged, stored, or uploaded. The app's internet
+permission is used only for the model download.
 
-## Building
+## Build
 
-Requirements: a recent Android SDK (API 37) and JDK 17+.
+Requires JDK 17 and the Android API 37 SDK.
 
 ```bash
-./gradlew assembleDebug
+./gradlew test assembleDebug lintDebug
 ```
 
-The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
-Run the unit tests and linter with `./gradlew test lintDebug`.
+The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Current limitations
+## License
 
-This is an intentional MVP:
-
-- English (en-US) recognition only.
-- The recognition model is downloaded on first use rather than bundled.
-- Controls are deliberately minimal — no settings, languages, or themes.
-
-## Attribution
-
-Speech recognition is provided by
-[Moonshine Voice](https://moonshine-voice.readthedocs.io) by
-[Moonshine AI](https://github.com/moonshine-ai).
+Scribe is licensed under the [GNU GPLv3](LICENSE). See
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for dependency attribution.
