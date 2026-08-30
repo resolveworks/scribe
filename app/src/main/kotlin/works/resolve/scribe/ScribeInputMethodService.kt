@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.inputmethodservice.InputMethodService
 import android.os.Handler
 import android.os.Looper
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -29,9 +30,8 @@ import works.resolve.scribe.ime.Backspace
 import works.resolve.scribe.ime.CommittedLine
 import works.resolve.scribe.ime.EditorActions
 import works.resolve.scribe.ime.TextJoining
+import works.resolve.scribe.ui.ime.DictationState
 import works.resolve.scribe.ui.ime.ImeKeyboard
-import works.resolve.scribe.ui.ime.ImeUiState
-import works.resolve.scribe.ui.ime.MicVisualState
 import works.resolve.scribe.ui.theme.ScribeTheme
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -43,7 +43,13 @@ private const val WORD_WINDOW_CHARS = 256
 private const val WORD_WINDOW_MAX_CHARS = 4096
 
 /**
- * Scribe voice IME.
+ * Scribe voice IME. The engine is always listening while the keyboard is
+ * shown: [syncDictation] reconciles [listeningWanted] with the facts
+ * whenever one of them changes (view shown or hidden, model presence), so
+ * recognition starts on its own once the model is ready — announced by a
+ * one-shot haptic — and stops when the keyboard hides. The mic button is a
+ * status and retry control, not a toggle; [dictationState] is the one state
+ * that both the engine logic and the input view live by.
  *
  * Moonshine usage follows the binding's contract: construction is cheap, the
  * blocking [MicTranscriber.load] / [MicTranscriber.start] run on one
@@ -53,8 +59,6 @@ private const val WORD_WINDOW_MAX_CHARS = 4096
  */
 class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
 
-    private enum class EngineState { IDLE, LOADING, STOPPING, LISTENING, FAILED }
-
     private val main = Handler(Looper.getMainLooper())
     private lateinit var worker: ExecutorService
 
@@ -63,7 +67,15 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
     /** Set in [onDestroy]; all Moonshine callbacks are gated on it. */
     @Volatile private var destroyed = false
 
-    @Volatile private var engineState = EngineState.IDLE
+    /** Dictation status; main-thread only, rendered directly by the input view. */
+    private var dictationState by mutableStateOf(DictationState.IDLE)
+
+    /**
+     * What the engine should be doing: true while the keyboard is shown and
+     * the prerequisites hold. Written on the main thread, read on the worker
+     * to decide whether an in-flight start may still call `start()`.
+     */
+    @Volatile private var listeningWanted = false
 
     /** Separator for the line being dictated, until it is committed. */
     private var pendingSeparator: String? = null
@@ -96,7 +108,6 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
         get() = savedStateController.savedStateRegistry
 
     private var inputComposeView: ComposeView? = null
-    private var uiState by mutableStateOf(ImeUiState())
 
     // -- Lifecycle -----------------------------------------------------------
 
@@ -128,7 +139,6 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
 
     override fun onCreateInputView(): View {
         inputComposeView?.disposeComposition()
-        refreshMicButton()
         // A window Recomposer looks up its owners from the IME window's root,
         // not only from the returned input view, so install them on both.
         window?.window?.decorView?.apply {
@@ -141,8 +151,8 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
             setContent {
                 ScribeTheme {
                     ImeKeyboard(
-                        state = uiState,
-                        onBack = ::switchToPreviousKeyboard,
+                        state = dictationState,
+                        onBack = ::switchToPreviousInputMethod,
                         onDelete = ::deleteBackwards,
                         onMicClick = ::onMicClicked,
                         onEnter = ::performEnter,
@@ -167,11 +177,10 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
         super.onStartInputView(info, restarting)
         when {
             // The model may have been downloaded in setup since the last look.
-            modelPresent != true -> checkModel()
-            !micPermissionGranted() -> handlePrerequisiteMissing()
+            modelPresent != true -> checkModelPresence()
+            !micPermissionGranted() -> handlePrerequisitesMissing()
+            else -> syncDictation()
         }
-        refreshMicButton()
-        maybeAutoStartDictation()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -186,7 +195,7 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
     override fun onWindowShown() {
         super.onWindowShown()
         lifecycleRegistry.currentState = Lifecycle.State.RESUMED
-        maybeAutoStartDictation()
+        syncDictation()
     }
 
     override fun onWindowHidden() {
@@ -194,39 +203,24 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
     }
 
-    // -- Field handling ------------------------------------------------------
+    // -- Prerequisites --------------------------------------------------------
 
-    private fun micEnabled(): Boolean =
-        engineState != EngineState.LOADING &&
-            engineState != EngineState.STOPPING
+    /** Both facts dictation needs: the model cached and the mic permitted. */
+    private fun prerequisitesMet(): Boolean =
+        modelPresent == true && micPermissionGranted()
 
     /** The IME never requests the permission itself — setup owns requests, so the SDK dialog can't pop over the host app. */
     private fun micPermissionGranted(): Boolean =
         checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
-    // -- Auto-start ----------------------------------------------------------
-
-    /** Starts dictation when the keyboard is visible and the engine is ready. */
-    private fun maybeAutoStartDictation() {
-        if (!isInputViewShown || modelPresent != true || !micPermissionGranted()) return
-        if (engineState != EngineState.IDLE && engineState != EngineState.FAILED) return
-        startDictation()
-    }
-
-    // -- Model cache --------------------------------------------------------
-
-    private fun checkModel() {
+    /** Re-checks the model cache off-thread; setup may have downloaded it since the last look. */
+    private fun checkModelPresence() {
         worker.execute {
             val present = MoonshineModel.isDownloaded(this)
             main.post {
                 if (destroyed) return@post
                 modelPresent = present
-                if (!present || !micPermissionGranted()) {
-                    handlePrerequisiteMissing()
-                } else {
-                    maybeAutoStartDictation()
-                }
-                refreshMicButton()
+                if (prerequisitesMet()) syncDictation() else handlePrerequisitesMissing()
             }
         }
     }
@@ -237,12 +231,12 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
      * user already saw setup and came back without fixing things, silently
      * return to their previous keyboard.
      */
-    private fun handlePrerequisiteMissing() {
+    private fun handlePrerequisitesMissing() {
         if (!setupPromptShown) {
             setupPromptShown = true
             openSetupScreen()
         } else {
-            switchToPreviousKeyboard()
+            switchToPreviousInputMethod()
         }
     }
 
@@ -255,90 +249,84 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
 
     // -- Dictation -----------------------------------------------------------
 
+    /**
+     * The mic button's only actions: open setup when a prerequisite is
+     * missing, and retry after a failure (or nudge a start that auto-start
+     * missed). While listening the control is disabled — there is no stop.
+     */
     private fun onMicClicked() {
-        when {
-            modelPresent == false -> openSetupScreen()
-            modelPresent == null -> Unit // Model-cache check still running.
-            !micPermissionGranted() -> openSetupScreen() // Setup owns permission requests.
-            !micEnabled() -> return
-            engineState == EngineState.LISTENING -> stopDictation()
-            else -> startDictation()
-        }
+        if (modelPresent == null) return // presence check still running
+        if (!prerequisitesMet()) openSetupScreen() else startDictation()
     }
 
+    /**
+     * Reconciles the engine with the facts whenever one changes (view shown
+     * or hidden, model presence). A FAILED start is left for the user to
+     * retry via the mic button; hiding the keyboard resets it, so the next
+     * show is a fresh attempt.
+     */
+    private fun syncDictation() {
+        val wanted = isInputViewShown && prerequisitesMet()
+        if (wanted == listeningWanted) return
+        if (wanted) startDictation() else stopDictation()
+    }
+
+    /**
+     * Starts recognition: the one slow `load()` plus `start()`, serialized on
+     * the worker. If the keyboard hides while the job is in flight,
+     * [listeningWanted] is false by the time it checks, so `start()` is never
+     * called after a hide — and the stop queued behind it finishes any
+     * cleanup.
+     */
     private fun startDictation() {
         if (currentInputConnection == null) return
+        listeningWanted = true
         pendingSeparator = null
-        engineState = EngineState.LOADING
-        refreshMicButton()
-        // load()/start() block; keep them off the main thread, serialized on the worker.
+        dictationState = DictationState.LOADING
         worker.execute {
-            try {
+            val started = try {
                 mic?.load()
-            } catch (_: Exception) {
-                failStart()
-                return@execute
-            }
-            // Cancelled mid-load: skip start() so the mic/permission dialog
-            // can never appear after the keyboard hid.
-            if (engineState != EngineState.LOADING) return@execute
-            try {
+                if (!listeningWanted) return@execute
                 mic?.start()
+                true
             } catch (_: Exception) {
-                failStart()
-                return@execute
+                false
             }
             main.post {
-                if (!destroyed && engineState == EngineState.LOADING) {
-                    engineState = EngineState.LISTENING
-                    refreshMicButton()
+                // Hidden again, destroyed, or already moved to FAILED by a
+                // mid-start engine error: that decision stands.
+                if (destroyed || !listeningWanted || dictationState != DictationState.LOADING) {
+                    return@post
                 }
-                // Else a queued mic.stop() already follows on the worker.
+                dictationState = if (started) DictationState.LISTENING else DictationState.FAILED
+                if (started) pulseReadyHaptic()
             }
         }
     }
 
-    private fun failStart() {
-        main.post {
-            if (destroyed || engineState != EngineState.LOADING) {
-                return@post
-            }
-            engineState = EngineState.FAILED
-            refreshMicButton()
-        }
-    }
-
+    /**
+     * Stops recognition from any state; the trailing final line still
+     * commits after a stop, and the next start is a fresh attempt.
+     */
     private fun stopDictation() {
-        when (engineState) {
-            EngineState.LISTENING -> {
-                engineState = EngineState.IDLE
-                refreshMicButton()
-                // onFinalLine still accepts the trailing final posted after stop().
-                mic?.stop()
-            }
-            EngineState.LOADING -> {
-                // start() sets its running flag last, so stop must run after
-                // the in-flight worker job or start would undo it.
-                engineState = EngineState.STOPPING
-                pendingSeparator = null
-                refreshMicButton()
-                worker.execute {
-                    mic?.stop()
-                    main.post {
-                        if (!destroyed && engineState == EngineState.STOPPING) {
-                            engineState = EngineState.IDLE
-                            refreshMicButton()
-                            maybeAutoStartDictation()
-                        }
-                    }
-                }
-            }
-            else -> Unit
-        }
+        listeningWanted = false
+        dictationState = DictationState.IDLE
+        // start() sets its running flag last, so a stop must land after any
+        // in-flight load()/start(); the single worker serializes that order.
+        worker.execute { mic?.stop() }
     }
+
+    /** One-shot pulse when listening begins, so the user knows to just talk. */
+    private fun pulseReadyHaptic() {
+        // performHapticFeedback honors the system haptic-feedback setting; no
+        // permission or vibrator plumbing needed.
+        inputComposeView?.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+    }
+
+    // -- Recognition output ---------------------------------------------------
 
     private fun onPartialText(text: String) {
-        if (destroyed || engineState != EngineState.LISTENING) return
+        if (destroyed || dictationState != DictationState.LISTENING) return
         val connection = currentInputConnection ?: return
         connection.setComposingText(separatorForCurrentField() + text, 1)
         partialActive = true
@@ -373,20 +361,8 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
 
     private fun onEngineError() {
         if (destroyed) return
-        if (engineState != EngineState.LISTENING && engineState != EngineState.LOADING) return
-        engineState = EngineState.FAILED
-        refreshMicButton()
-    }
-
-    // -- Keyboard switch ----------------------------------------------------
-
-    /**
-     * Returns to the keyboard the user switched here from. The framework's
-     * usual finish/hide callbacks then stop dictation, exactly as when the
-     * system's own IME switcher is used.
-     */
-    private fun switchToPreviousKeyboard() {
-        switchToPreviousInputMethod()
+        if (dictationState != DictationState.LISTENING && dictationState != DictationState.LOADING) return
+        dictationState = DictationState.FAILED
     }
 
     // -- Editing keys --------------------------------------------------------
@@ -496,19 +472,5 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
                 ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
             }
         }
-    }
-
-    // -- UI ------------------------------------------------------------------
-
-    private fun refreshMicButton() {
-        uiState = uiState.copy(
-            micState = when (engineState) {
-                EngineState.LOADING -> MicVisualState.LOADING
-                EngineState.LISTENING -> MicVisualState.LISTENING
-                EngineState.FAILED -> MicVisualState.FAILED
-                else -> MicVisualState.IDLE
-            },
-            micEnabled = micEnabled(),
-        )
     }
 }

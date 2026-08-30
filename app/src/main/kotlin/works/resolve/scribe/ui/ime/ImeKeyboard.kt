@@ -16,7 +16,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -28,19 +27,13 @@ import androidx.compose.ui.unit.dp
 import works.resolve.scribe.R
 import works.resolve.scribe.ui.theme.ScribeTheme
 
-internal enum class MicVisualState { IDLE, LOADING, LISTENING, FAILED }
-
-/** Visual state of the IME controls, hosted by the service. */
-@Immutable
-internal data class ImeUiState(
-    val micState: MicVisualState = MicVisualState.IDLE,
-    val micEnabled: Boolean = false,
-)
+/** Dictation status, shared by the engine logic and the input view. */
+internal enum class DictationState { IDLE, LOADING, LISTENING, FAILED }
 
 /** The complete, deliberately small input view hosted by InputMethodService. */
 @Composable
 internal fun ImeKeyboard(
-    state: ImeUiState,
+    state: DictationState,
     onBack: () -> Unit,
     onDelete: () -> Unit,
     onMicClick: () -> Unit,
@@ -110,9 +103,14 @@ private fun KeyboardKey(
     }
 }
 
+/**
+ * The keyboard is always listening while shown, so the mic is a status
+ * indicator while transcribing (disabled — there is no stop), and a retry
+ * or setup affordance otherwise.
+ */
 @Composable
-private fun MicControl(state: ImeUiState, onClick: () -> Unit) {
-    if (state.micState == MicVisualState.LOADING) {
+private fun MicControl(state: DictationState, onClick: () -> Unit) {
+    if (state == DictationState.LOADING) {
         val loadingDescription = stringResource(R.string.ime_cd_loading)
         Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
@@ -124,26 +122,22 @@ private fun MicControl(state: ImeUiState, onClick: () -> Unit) {
         return
     }
 
-    val listening = state.micState == MicVisualState.LISTENING
+    val listening = state == DictationState.LISTENING
     val description = stringResource(
         when {
-            listening -> R.string.ime_cd_mic_stop
-            state.micState == MicVisualState.FAILED -> R.string.ime_cd_mic_retry
+            listening -> R.string.ime_cd_mic_listening
+            state == DictationState.FAILED -> R.string.ime_cd_mic_retry
             else -> R.string.ime_cd_mic_start
         }
     )
     FilledIconButton(
         onClick = onClick,
-        enabled = state.micEnabled,
+        enabled = !listening,
         modifier = Modifier.size(72.dp),
     ) {
         Icon(
             painter = painterResource(
-                when {
-                    listening -> R.drawable.mic_off_24
-                    state.micState == MicVisualState.FAILED -> R.drawable.mic_alert_24
-                    else -> R.drawable.mic_24
-                }
+                if (state == DictationState.FAILED) R.drawable.mic_alert_24 else R.drawable.mic_24
             ),
             contentDescription = description,
             modifier = Modifier.size(32.dp),
@@ -156,10 +150,7 @@ private fun MicControl(state: ImeUiState, onClick: () -> Unit) {
 private fun ImeKeyboardPreview() {
     ScribeTheme {
         ImeKeyboard(
-            state = ImeUiState(
-                micState = MicVisualState.FAILED,
-                micEnabled = true,
-            ),
+            state = DictationState.FAILED,
             onBack = {},
             onDelete = {},
             onMicClick = {},

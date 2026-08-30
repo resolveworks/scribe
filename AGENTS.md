@@ -1,39 +1,38 @@
 # Scribe
 
-A privacy-first Android voice keyboard (IME) built on Moonshine Voice. This
-is an MVP on purpose; see the hard rules before adding scope.
+A privacy-first Android voice keyboard (IME) built on Moonshine Voice.
+Deliberately an MVP — see the hard rules before adding scope.
 
 ## Scope / MVP
 
-- A voice-input IME: tap the mic, speak, text lands in the focused field as
-  partial (`onText` → composing) and final (`onLine` → committed) segments.
-- A minimal Compose setup activity guiding the user through enabling the IME,
-  granting the microphone permission, and downloading the speech model
-  (default Material 3 look, dynamic system colors; no custom styling).
-- English (en-US) only, on-device recognition only.
+- A voice-input IME, always listening while the keyboard is shown: speech
+  lands in the focused field as partials (`onText` → composing text) and
+  committed lines (`onLine`).
+- A minimal Compose setup activity: enable the IME, grant the microphone
+  permission, download the speech model. Default Material 3 look, dynamic
+  system colors, no custom styling.
+- English (en-US), on-device recognition only.
 
-Out of scope for the MVP: settings screens, other languages, non-voice
-keyboards, transcript history, cloud services.
+Out of scope: settings screens, other languages, non-voice keyboards,
+transcript history, cloud services.
 
 ## Architecture / layout
 
 - `app/src/main/kotlin/works/resolve/scribe/`
-  - `ScribeInputMethodService.kt` — the IME host and engine state machine
-    (IDLE/LOADING/STOPPING/LISTENING/FAILED), with a single serialized
-    background executor for blocking Moonshine calls and a STOPPING barrier
-    for stop-vs-start races. It supplies the lifecycle owners required
-    by the Compose input view.
-  - `MainActivity.kt` + `ui/setup/SetupScreen.kt` + `ui/ime/ImeKeyboard.kt` +
-    `ui/theme/` — the Compose setup flow and minimal Material 3 IME UI.
-  - `MoonshineModel.kt` — shared model-cache helper: setup checks/downloads
-    the model here; the IME checks presence without a blocking `load()`. The
-    spec must mirror `MicTranscriber`'s defaults so both hit the same cache
-    directory.
-  - `ime/ImePolicies.kt` — pure, unit-tested policy helpers (separator
-    logic and enter-key decision). Keep new logic pure
+  - `ScribeInputMethodService.kt` — the IME host: always listening while
+    the input view is shown (`syncDictation` reconciles a
+    `listeningWanted` intent with the facts), with one serialized worker
+    for all blocking Moonshine calls. `DictationState` is the single state
+    shared by engine logic and the input view.
+  - `MainActivity.kt`, `ui/setup/SetupScreen.kt`, `ui/ime/ImeKeyboard.kt`,
+    `ui/theme/` — the Compose setup flow and minimal IME UI.
+  - `MoonshineModel.kt` — shared model-cache helper (setup downloads here,
+    the IME only checks presence). The spec must mirror `MicTranscriber`'s
+    defaults so both hit the same cache directory.
+  - `ime/ImePolicies.kt` — pure, unit-tested policy helpers; put new logic
     here, not in the service.
-- `app/src/main/res/` — icons and `xml/input_method.xml` (single en-US voice
-  subtype).
+- `app/src/main/res/` — icons and `xml/input_method.xml` (single en-US
+  voice subtype).
 
 ## Commands
 
@@ -45,33 +44,28 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Authoritative references
 
-- Moonshine Voice docs (never trust remembered APIs): https://moonshine-voice.readthedocs.io
-  - Adding the library: https://moonshine-voice.readthedocs.io/en/latest/using/adding-the-library/
-  - Transcription: https://moonshine-voice.readthedocs.io/en/latest/using/transcription/
-- Live SDK sources (pinned version is in `gradle/libs.versions.toml`): inspect
-  the resolved `ai.moonshine:moonshine-voice` AAR/classes in the Gradle cache
-  when the docs are unclear.
-- Local upstream checkout and sample apps: `~/Projects/moonshine/` — see
-  `.agents/skills/moonshine-voice/SKILL.md` and the Android sample under
-  `examples/android/Transcriber/`. Do not copy their code or branded assets
-  blindly; this app has its own UI.
+- Moonshine docs — never trust remembered APIs: https://moonshine-voice.readthedocs.io
+  ([adding the library](https://moonshine-voice.readthedocs.io/en/latest/using/adding-the-library/),
+  [transcription](https://moonshine-voice.readthedocs.io/en/latest/using/transcription/)).
+- Pinned SDK sources: the resolved `ai.moonshine:moonshine-voice` AAR in
+  the Gradle cache (version in `gradle/libs.versions.toml`) when the docs
+  are unclear.
+- Local upstream checkout: `~/Projects/moonshine/` — see
+  `.agents/skills/moonshine-voice/SKILL.md` and the sample under
+  `examples/android/Transcriber/`. Don't copy its code or branded assets.
 
 ## Hard rules
 
-- **API 37 only.** compileSdk = minSdk = targetSdk = 37 deliberately. Do not
-  add legacy compatibility branches, `Build.VERSION` guards for older
-  releases, or lower any SDK version.
-- **Toolchain stays bleeding-edge.** Do not downgrade AGP, Kotlin, Gradle, or
-  library versions to fix something; find the current-API way instead.
+- **API 37 only** (compileSdk = minSdk = targetSdk). No compatibility
+  branches, `Build.VERSION` guards, or lowered SDK versions.
+- **Toolchain stays bleeding-edge.** Never downgrade AGP, Kotlin, Gradle,
+  or libraries to fix something — find the current-API way.
 - **Moonshine contract:** construct → configure → `load()` → `start()`.
-  Constructors are cheap; `load()`/`start()`/`close()` block. Keep every
-  blocking call off the main thread and serialized on the single worker
-  executor in the service so lifecycle operations cannot interleave.
-- **`onText` is a changing partial** (set as composing text); **`onLine` is
-  the final line** (commit). Never persist or treat partials as final.
+  `load()`/`start()`/`close()` block; keep them on the service's single
+  worker executor, never the main thread.
+- **`onText` is a changing partial (composing); `onLine` is the final line
+  (commit).** Never persist or treat partials as final.
 - **Never log or persist transcripts or audio.** Recognition is on-device;
-  audio must never leave the device. The INTERNET permission exists only for
-  the one-time first-use model download.
-- **IME UI stays minimal.** A standalone ComposeView returned from
-  `onCreateInputView()` uses standard Material 3 components. No Fragments or
-  persistent UI state in the IME process.
+  the INTERNET permission exists only for the one-time model download.
+- **IME UI stays minimal:** one ComposeView from `onCreateInputView()`,
+  standard Material 3 components, no Fragments or persistent UI state.
