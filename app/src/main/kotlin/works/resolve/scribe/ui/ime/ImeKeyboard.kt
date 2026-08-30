@@ -17,10 +17,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -114,8 +111,9 @@ private fun KeyboardKey(
  * and a retry or setup affordance otherwise.
  *
  * A translucent halo behind the button reflects the live input level
- * while listening (0..1); the engine drives it to 0 otherwise, so the
- * halo shrinks back to barely peeking past the button.
+ * while listening (0..1), rendered directly from fresh capture levels;
+ * the engine drives it to 0 otherwise, so the halo shrinks back to
+ * barely peeking past the button.
  */
 @Composable
 private fun MicControl(state: DictationState, level: Float, onClick: () -> Unit) {
@@ -130,12 +128,7 @@ private fun MicControl(state: DictationState, level: Float, onClick: () -> Unit)
         }
     )
     val haloColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-    val haloLevel by animateFloatAsState(
-        targetValue = level,
-        animationSpec = tween(durationMillis = 100),
-        label = "micHaloLevel",
-    )
-    val haloRadius = (40 + 28 * haloLevel).dp
+    val haloRadius = (40 + 28 * level).dp
     Box {
         Canvas(modifier = Modifier.size(72.dp)) {
             drawCircle(color = haloColor, radius = haloRadius.toPx())
