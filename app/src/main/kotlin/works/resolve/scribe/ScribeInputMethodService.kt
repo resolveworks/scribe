@@ -390,6 +390,11 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
         if (dictationState != DictationState.LISTENING && dictationState != DictationState.LOADING) return
         micLevel = 0f
         dictationState = DictationState.FAILED
+        // A failed session left its threads and session state behind; stop()
+        // clears them so a mic-button retry starts clean. Idempotent (a
+        // no-op when idle), so duplicate errors enqueue harmlessly, and the
+        // worker is still live here because `destroyed` gates above.
+        worker.execute { engine?.stop() }
     }
 
     // -- Editing keys --------------------------------------------------------
