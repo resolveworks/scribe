@@ -149,7 +149,8 @@ internal class DictationEngine(
         // Stream lifecycle lives entirely on this thread: created and
         // started here, stopped (flushing the trailing final line) and freed
         // in the finally below, before stop()'s join() can return.
-        var streamHandle = 0
+        // -1 = no stream yet, mirroring Transcriber's own defaultStreamHandle sentinel.
+        var streamHandle = -1
         var streamStarted = false
         try {
             recorder.startRecording()
@@ -160,7 +161,12 @@ internal class DictationEngine(
             val samples = ShortArray(READ_SAMPLES)
             while (running) {
                 val read = recorder.read(samples, 0, READ_SAMPLES)
-                if (read <= 0) break
+                if (read <= 0) {
+                    // A dead read is a capture failure, not a quiet exit —
+                    // otherwise the service stays LISTENING with no audio.
+                    post(onError)
+                    break
+                }
                 val chunk = if (read == samples.size) samples else samples.copyOf(read)
                 val floats = FloatArray(read) { chunk[it] / 32768f }
                 post { onLevel(AudioLevels.magnitudeOf(AudioLevels.rms(chunk))) }
@@ -171,7 +177,7 @@ internal class DictationEngine(
         } finally {
             try {
                 if (streamStarted) transcriber.stopStream(streamHandle)
-                if (streamHandle != 0) transcriber.freeStream(streamHandle)
+                if (streamHandle >= 0) transcriber.freeStream(streamHandle)
             } catch (_: Throwable) {
                 // A failure above may have torn things down already.
             }
