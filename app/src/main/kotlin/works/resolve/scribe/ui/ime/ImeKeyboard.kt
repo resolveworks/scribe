@@ -1,7 +1,9 @@
 package works.resolve.scribe.ui.ime
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,8 +17,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -32,6 +38,7 @@ internal enum class DictationState { IDLE, LOADING, LISTENING, FAILED }
 @Composable
 internal fun ImeKeyboard(
     state: DictationState,
+    level: Float = 0f,
     onBack: () -> Unit,
     onDelete: () -> Unit,
     onMicClick: () -> Unit,
@@ -73,7 +80,7 @@ internal fun ImeKeyboard(
                     description = stringResource(R.string.ime_cd_delete),
                     onClick = onDelete,
                 )
-                MicControl(state, onMicClick)
+                MicControl(state, level, onMicClick)
                 KeyboardKey(
                     iconRes = R.drawable.keyboard_return_24,
                     description = stringResource(R.string.ime_cd_enter),
@@ -106,9 +113,13 @@ private fun KeyboardKey(
  * indicator while the engine works — faded while the model loads, white
  * once actively listening, not clickable either way (there is no stop) —
  * and a retry or setup affordance otherwise.
+ *
+ * A translucent halo behind the button reflects the live input level
+ * while listening (0..1); the engine drives it to 0 otherwise, so the
+ * halo shrinks back to barely peeking past the button.
  */
 @Composable
-private fun MicControl(state: DictationState, onClick: () -> Unit) {
+private fun MicControl(state: DictationState, level: Float, onClick: () -> Unit) {
     val listening = state == DictationState.LISTENING
     val loading = state == DictationState.LOADING
     val description = stringResource(
@@ -119,29 +130,41 @@ private fun MicControl(state: DictationState, onClick: () -> Unit) {
             else -> R.string.ime_cd_mic_start
         }
     )
-    FilledIconButton(
-        onClick = onClick,
-        enabled = !listening && !loading,
-        // Disabled yet white while listening: the full tone marks the live
-        // mic, while fading stays reserved for the loading state.
-        colors =
-            if (listening) {
-                IconButtonDefaults.filledIconButtonColors(
-                    disabledContainerColor = MaterialTheme.colorScheme.primary,
-                    disabledContentColor = MaterialTheme.colorScheme.onPrimary,
-                )
-            } else {
-                IconButtonDefaults.filledIconButtonColors()
-            },
-        modifier = Modifier.size(72.dp),
-    ) {
-        Icon(
-            painter = painterResource(
-                if (state == DictationState.FAILED) R.drawable.mic_alert_24 else R.drawable.mic_24
-            ),
-            contentDescription = description,
-            modifier = Modifier.size(32.dp),
-        )
+    val haloColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
+    val haloLevel by animateFloatAsState(
+        targetValue = level,
+        animationSpec = tween(durationMillis = 100),
+        label = "micHaloLevel",
+    )
+    val haloRadius = (40 + 56 * haloLevel).dp
+    Box(contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.size(72.dp)) {
+            drawCircle(color = haloColor, radius = haloRadius.toPx(), style = Fill)
+        }
+        FilledIconButton(
+            onClick = onClick,
+            enabled = !listening && !loading,
+            // Disabled yet white while listening: the full tone marks the live
+            // mic, while fading stays reserved for the loading state.
+            colors =
+                if (listening) {
+                    IconButtonDefaults.filledIconButtonColors(
+                        disabledContainerColor = MaterialTheme.colorScheme.primary,
+                        disabledContentColor = MaterialTheme.colorScheme.onPrimary,
+                    )
+                } else {
+                    IconButtonDefaults.filledIconButtonColors()
+                },
+            modifier = Modifier.size(72.dp),
+        ) {
+            Icon(
+                painter = painterResource(
+                    if (state == DictationState.FAILED) R.drawable.mic_alert_24 else R.drawable.mic_24
+                ),
+                contentDescription = description,
+                modifier = Modifier.size(32.dp),
+            )
+        }
     }
 }
 
@@ -150,7 +173,8 @@ private fun MicControl(state: DictationState, onClick: () -> Unit) {
 private fun ImeKeyboardPreview() {
     ScribeTheme {
         ImeKeyboard(
-            state = DictationState.FAILED,
+            state = DictationState.LISTENING,
+            level = 0.7f,
             onBack = {},
             onDelete = {},
             onMicClick = {},
