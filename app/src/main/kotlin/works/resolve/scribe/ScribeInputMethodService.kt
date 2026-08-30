@@ -316,6 +316,10 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
     private fun stopDictation() {
         listeningWanted = false
         dictationState = DictationState.IDLE
+        // super.onDestroy() re-enters here via finishViews after the worker
+        // has been shut down; close() is already queued and mic is null, so
+        // submitting would only throw RejectedExecutionException.
+        if (destroyed) return
         // start() sets its running flag last, so a stop must land after any
         // in-flight load()/start(); the single worker serializes that order.
         worker.execute { mic?.stop() }
