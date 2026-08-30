@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "works.resolve.scribe"
-        minSdk = 37
+        minSdk = 36
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"

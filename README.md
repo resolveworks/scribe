@@ -17,7 +17,7 @@ the device.
 - English (en-US) dictation
 - Live partial transcription
 - Delete, enter, and return-to-previous-keyboard controls
-- Android API 37 only
+- Android 16 (API 36) or newer
 - No settings, history, cloud services, or conventional keyboard
 
 This is an intentionally minimal, personal-use project rather than a polished

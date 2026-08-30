@@ -59,8 +59,9 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Hard rules
 
-- **API 37 only** (compileSdk = minSdk = targetSdk). No compatibility
-  branches, `Build.VERSION` guards, or lowered SDK versions.
+- **Android 16 (API 36) floor** (minSdk = 36; compileSdk = targetSdk =
+  newest). No compatibility branches, `Build.VERSION` guards, or lowering
+  minSdk below 36.
 - **Toolchain stays bleeding-edge.** Never downgrade AGP, Kotlin, Gradle,
   or libraries to fix something — find the current-API way.
 - **Moonshine contract:** construct → configure → `load()` → `start()` on
