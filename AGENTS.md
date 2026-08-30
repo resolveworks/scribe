@@ -26,9 +26,12 @@ transcript history, cloud services.
     shared by engine logic and the input view.
   - `MainActivity.kt`, `ui/setup/SetupScreen.kt`, `ui/ime/ImeKeyboard.kt`,
     `ui/theme/` — the Compose setup flow and minimal IME UI.
-  - `MoonshineModel.kt` — shared model-cache helper (setup downloads here,
-    the IME only checks presence). The spec must mirror `MicTranscriber`'s
-    defaults so both hit the same cache directory.
+  - `MoonshineModel.kt` — the single owner of the model spec (arch,
+    language): setup downloads here, the IME checks presence, and
+    `DictationEngine` loads from the same cache directory.
+  - `DictationEngine.kt` — our own AudioRecord capture loop feeding the
+    base `Transcriber`; all of `load()`/`stop()`/`close()` and the capture
+    thread are blocking and never touch the main thread.
   - `ime/ImePolicies.kt` — pure, unit-tested policy helpers; put new logic
     here, not in the service.
 - `app/src/main/res/` — icons and `xml/input_method.xml` (single en-US
@@ -60,9 +63,13 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
   branches, `Build.VERSION` guards, or lowered SDK versions.
 - **Toolchain stays bleeding-edge.** Never downgrade AGP, Kotlin, Gradle,
   or libraries to fix something — find the current-API way.
-- **Moonshine contract:** construct → configure → `load()` → `start()`.
-  `load()`/`start()`/`close()` block; keep them on the service's single
-  worker executor, never the main thread.
+- **Moonshine contract:** construct → configure → `load()` → `start()` on
+  our own `DictationEngine` (base `Transcriber` underneath).
+  `load()`/`stop()`/`close()` block; keep them on the service's single
+  worker executor, never the main thread. All native Moonshine calls are
+  never concurrent: `load()`/`close()` run on the worker, every stream op
+  on the single capture thread, and `stop()`/`close()` join that thread
+  without timeout before any further native call.
 - **`onText` is a changing partial (composing); `onLine` is the final line
   (commit).** Never persist or treat partials as final.
 - **Never log or persist transcripts or audio.** Recognition is on-device;

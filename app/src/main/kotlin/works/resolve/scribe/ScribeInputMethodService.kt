@@ -13,7 +13,6 @@ import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
-import ai.moonshine.voice.MicTranscriber
 import ai.moonshine.voice.TranscriptLine
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,18 +51,22 @@ private const val WORD_WINDOW_MAX_CHARS = 4096
  * status and retry control, not a toggle; [dictationState] is the one state
  * that both the engine logic and the input view live by.
  *
- * Moonshine usage follows the binding's contract: construction is cheap, the
- * blocking [MicTranscriber.load] / [MicTranscriber.start] run on one
- * serialized background executor, `onText` is treated as a changing partial
- * (composing text), `onLine` as a finished line (committed text), and the
- * model stays loaded and reusable while the service lives.
+ * Moonshine usage follows a single-native-access discipline: the blocking
+ * [DictationEngine.load] / [DictationEngine.stop] /
+ * [DictationEngine.close] run on one serialized background executor, while
+ * every stream call happens on the engine's own capture thread, which
+ * stop()/close() join without timeout before any further native call —
+ * making the upstream close-during-decode crash (#223) structurally
+ * impossible. `onText` is treated as a changing partial (composing text),
+ * `onLine` as a finished line (committed text), and the model stays loaded
+ * and reusable while the service lives.
  */
 class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
 
     private val main = Handler(Looper.getMainLooper())
     private lateinit var worker: ExecutorService
 
-    private var mic: MicTranscriber? = null
+    private var engine: DictationEngine? = null
 
     /** Set in [onDestroy]; all Moonshine callbacks are gated on it. */
     @Volatile private var destroyed = false
@@ -77,6 +80,9 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
      * to decide whether an in-flight start may still call `start()`.
      */
     @Volatile private var listeningWanted = false
+
+    /** Live mic loudness 0..1; main-thread only, rendered by the input view. */
+    private var micLevel by mutableStateOf(0f)
 
     /** Separator for the line being dictated, until it is committed. */
     private var pendingSeparator: String? = null
@@ -118,19 +124,23 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
         savedStateController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         worker = Executors.newSingleThreadExecutor()
-        mic = MicTranscriber(this)
-            .onText(::onPartialText)
-            .onLine(::onFinalLine)
-            .onError { onEngineError() }
+        engine = DictationEngine(
+            context = this,
+            onText = ::onPartialText,
+            onLine = ::onFinalLine,
+            onError = ::onEngineError,
+            onLevel = ::onMicLevel,
+        )
     }
 
     override fun onDestroy() {
         destroyed = true
-        val m = mic
-        mic = null
-        // close() interrupts threads and joins; keep it off the main thread,
-        // serialized after any in-flight load()/start().
-        worker.execute { runCatching { m?.close() } }
+        val e = engine
+        engine = null
+        micLevel = 0f
+        // close() joins the capture thread unbounded before native teardown;
+        // keep it off the main thread, serialized after any in-flight work.
+        worker.execute { runCatching { e?.close() } }
         worker.shutdown()
         inputComposeView?.disposeComposition()
         inputComposeView = null
@@ -157,6 +167,7 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
                 ScribeTheme {
                     ImeKeyboard(
                         state = dictationState,
+                        level = micLevel,
                         onBack = ::switchToPreviousInputMethod,
                         onDelete = ::deleteBackwards,
                         onMicClick = ::onMicClicked,
@@ -290,9 +301,9 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
         dictationState = DictationState.LOADING
         worker.execute {
             val started = try {
-                mic?.load()
+                engine?.load()
                 if (!listeningWanted) return@execute
-                mic?.start()
+                engine?.start()
                 true
             } catch (_: Exception) {
                 false
@@ -316,13 +327,15 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
     private fun stopDictation() {
         listeningWanted = false
         dictationState = DictationState.IDLE
+        micLevel = 0f
         // super.onDestroy() re-enters here via finishViews after the worker
         // has been shut down; close() is already queued and mic is null, so
         // submitting would only throw RejectedExecutionException.
         if (destroyed) return
-        // start() sets its running flag last, so a stop must land after any
-        // in-flight load()/start(); the single worker serializes that order.
-        worker.execute { mic?.stop() }
+        // start() launches its capture thread last, so a stop must land
+        // after any in-flight load()/start(); the single worker serializes
+        // that order, and stop() joins the thread before returning.
+        worker.execute { engine?.stop() }
     }
 
     /** One-shot pulse when listening begins, so the user knows to just talk. */
@@ -368,9 +381,15 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
             .also { pendingSeparator = it }
     }
 
+    private fun onMicLevel(level: Float) {
+        if (destroyed || dictationState != DictationState.LISTENING) return
+        micLevel = level
+    }
+
     private fun onEngineError() {
         if (destroyed) return
         if (dictationState != DictationState.LISTENING && dictationState != DictationState.LOADING) return
+        micLevel = 0f
         dictationState = DictationState.FAILED
     }
 
