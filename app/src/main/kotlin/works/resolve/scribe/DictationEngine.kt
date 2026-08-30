@@ -62,8 +62,6 @@ internal class DictationEngine(
                     main.post { onText(event.line.text.orEmpty()) }
                 is TranscriptEvent.LineCompleted ->
                     main.post { onLine(event.line) }
-                is TranscriptEvent.Error ->
-                    main.post(onError)
                 else -> Unit
             }
         }
@@ -83,12 +81,8 @@ internal class DictationEngine(
      */
     fun load() {
         if (transcriber.isLoaded) return
-        try {
-            val directory = MoonshineModel.directory(context)
-            transcriber.loadFromFiles(directory.absolutePath, MoonshineModel.arch)
-        } catch (e: Exception) {
-            throw IllegalStateException("Failed to load the speech-to-text model", e)
-        }
+        val directory = MoonshineModel.directory(context)
+        transcriber.loadFromFiles(directory.absolutePath, MoonshineModel.arch)
     }
 
     /**
@@ -155,6 +149,7 @@ internal class DictationEngine(
     @SuppressLint("MissingPermission")
     private fun captureLoop(queue: LinkedBlockingQueue<FloatArray>) {
         var recorder: AudioRecord? = null
+        var recordingStarted = false
         try {
             val minBytes = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL, ENCODING)
             val bufferBytes = maxOf(minBytes, MIN_BUFFER_BYTES)
@@ -167,6 +162,7 @@ internal class DictationEngine(
             ).also { check(it.state == AudioRecord.STATE_INITIALIZED) }
 
             recorder.startRecording()
+            recordingStarted = true
             val samples = ShortArray(READ_SAMPLES)
             while (running) {
                 val read = recorder.read(samples, 0, READ_SAMPLES)
@@ -186,26 +182,14 @@ internal class DictationEngine(
                 // nothing on the mic side and drops no audio.
                 queue.offer(floats)
             }
-        } catch (_: Throwable) {
+        } catch (_: Exception) {
             main.post(onError)
         } finally {
-            try {
-                recorder?.let {
-                    // Stop the hardware before releasing; both on our thread.
-                    try {
-                        it.stop()
-                    } catch (_: Throwable) {
-                        // Never started, or already stopped — release either way.
-                    }
-                    it.release()
-                }
-            } finally {
-                // The session's end-of-stream marker, after any last audio —
-                // the outermost finally action, so it is enqueued no matter
-                // what teardown above threw. Non-blocking: the queue is
-                // unbounded, so add() always succeeds.
-                queue.add(END_OF_STREAM)
-            }
+            if (recordingStarted) recorder?.stop()
+            recorder?.release()
+            // FIFO marker after the last captured audio; the unbounded queue
+            // makes add() non-blocking.
+            queue.add(END_OF_STREAM)
         }
     }
 
@@ -226,16 +210,15 @@ internal class DictationEngine(
             while (true) {
                 batch.add(queue.take())
                 queue.drainTo(batch)
-                var samples = 0
-                var endOfStream = false
-                for (c in batch) {
-                    if (c === END_OF_STREAM) endOfStream = true else samples += c.size
-                }
+                // Capture is the only producer and enqueues EOS last, so if
+                // this batch contains it, it can only be the final element.
+                val endOfStream = batch.last() === END_OF_STREAM
+                if (endOfStream) batch.removeAt(batch.lastIndex)
+                val samples = batch.sumOf { it.size }
                 if (samples > 0) {
                     val audio = FloatArray(samples)
                     var offset = 0
                     for (c in batch) {
-                        if (c === END_OF_STREAM) continue
                         System.arraycopy(c, 0, audio, offset, c.size)
                         offset += c.size
                     }
@@ -244,22 +227,14 @@ internal class DictationEngine(
                 batch.clear()
                 if (endOfStream) break
             }
-        } catch (_: Throwable) {
+        } catch (_: Exception) {
             // End capture promptly: its next ~32ms read exits the loop (and
             // enqueues EOS), rather than queueing audio nobody will use.
             running = false
             main.post(onError)
         } finally {
-            if (streamStarted) {
-                // Flushes the trailing final line. If the loop above failed
-                // mid-stream this may itself fail; either way the stream is
-                // over and close()'s model teardown is still awaited by the
-                // join, so no native call races another.
-                try {
-                    transcriber.stop()
-                } catch (_: Throwable) {
-                }
-            }
+            // Flush the trailing final line before stop()'s join returns.
+            if (streamStarted) transcriber.stop()
         }
     }
 
