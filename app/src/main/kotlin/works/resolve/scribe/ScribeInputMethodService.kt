@@ -9,6 +9,7 @@ import android.os.Looper
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.View
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
@@ -145,6 +146,10 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
             setViewTreeLifecycleOwner(this@ScribeInputMethodService)
             setViewTreeSavedStateRegistryOwner(this@ScribeInputMethodService)
         }
+        // The keyboard is open exactly while dictation is wanted, so keep
+        // the screen awake for the life of its window: the flag is inert the
+        // moment the IME dialog hides, no state tracking needed.
+        window?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         return ComposeView(this).apply {
             setViewTreeLifecycleOwner(this@ScribeInputMethodService)
             setViewTreeSavedStateRegistryOwner(this@ScribeInputMethodService)
