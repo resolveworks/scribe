@@ -137,7 +137,6 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
         destroyed = true
         val e = engine
         engine = null
-        micLevel = 0f
         // close() joins the capture thread unbounded before native teardown;
         // keep it off the main thread, serialized after any in-flight work.
         worker.execute { runCatching { e?.close() } }

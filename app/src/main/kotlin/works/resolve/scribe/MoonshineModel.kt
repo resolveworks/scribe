@@ -11,7 +11,7 @@ import java.io.File
  * Shared view of the Moonshine speech-model cache — the single owner of
  * the model spec used by the app. Nothing else picks an arch or language:
  * setup downloads via [download], the IME checks [isDownloaded], and
- * [DictationEngine.load] loads from [ensureDownloaded].
+ * [DictationEngine] loads from [directory].
  */
 object MoonshineModel {
 
@@ -21,7 +21,8 @@ object MoonshineModel {
     private fun spec(): ModelSpec =
         ModelSpec.stt("en", arch, false)
 
-    private fun directory(context: Context): File =
+    /** The cache directory the spec resolves to; what [DictationEngine] loads from. */
+    fun directory(context: Context): File =
         ModelCache.directoryFor(context, spec(), null)
 
     /**
@@ -30,16 +31,6 @@ object MoonshineModel {
      */
     fun isDownloaded(context: Context): Boolean =
         AssetDownloader().isModelPresent(directory(context), spec())
-
-    /**
-     * Ensures the model is cached and returns its directory, ready for
-     * `loadFromFiles`. Blocking (network + file I/O); throws on failure.
-     */
-    fun ensureDownloaded(context: Context): File {
-        val dir = directory(context)
-        AssetDownloader().ensureModelPresent(dir, spec()) { _, _, _, _, _ -> }
-        return dir
-    }
 
     /**
      * Downloads any missing model files into the cache. Blocking network I/O;

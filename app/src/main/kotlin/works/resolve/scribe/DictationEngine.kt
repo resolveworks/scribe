@@ -30,9 +30,9 @@ import works.resolve.scribe.ime.AudioLevels
  *    has finished its own `stopStream`/`freeStream` before `close()` can
  *    free the model. No bounded-join heuristic.
  *
- * Blocking: `load()` may download the model, `stop()` waits for one final
- * ~100ms read plus flush, `close()` does `stop()` plus the native teardown.
- * Keep all of them off the main thread.
+ * Blocking: `load()` reads the cached model (setup owns downloads),
+ * `stop()` waits for one final ~100ms read plus flush, `close()` does `stop()`
+ * plus the native teardown. Keep all of them off the main thread.
  *
  * All callbacks ([onText], [onLine], [onError], [onLevel]) are delivered on
  * the main thread; the transcriber emits events inline from the capture
@@ -51,11 +51,11 @@ internal class DictationEngine(
         addListener { event ->
             when (event) {
                 is TranscriptEvent.LineTextChanged ->
-                    post { onText(event.line.text.orEmpty()) }
+                    main.post { onText(event.line.text.orEmpty()) }
                 is TranscriptEvent.LineCompleted ->
-                    post { onLine(event.line) }
+                    main.post { onLine(event.line) }
                 is TranscriptEvent.Error ->
-                    post { onError() }
+                    main.post(onError)
                 else -> Unit
             }
         }
@@ -67,21 +67,14 @@ internal class DictationEngine(
     /** Owned by the worker thread that runs start()/stop()/close(). */
     private var captureThread: Thread? = null
 
-    private var closed = false
-
-    private fun post(action: () -> Unit) {
-        main.post(action)
-    }
-
     /**
-     * Ensures the model is cached, then loads it. Blocking (network, file
-     * I/O, native); call on the worker. Throws [IllegalStateException] on
-     * failure.
+     * Loads the model from the cache directory (setup owns downloads; the
+     * service only starts dictation after checking presence). Blocking
+     * (file I/O, native); call on the worker. Throws on failure.
      */
     fun load() {
-        check(!closed) { "engine is closed" }
         try {
-            val directory = MoonshineModel.ensureDownloaded(context)
+            val directory = MoonshineModel.directory(context)
             transcriber.loadFromFiles(directory.absolutePath, MoonshineModel.arch)
         } catch (e: Exception) {
             throw IllegalStateException("Failed to load the speech-to-text model", e)
@@ -91,11 +84,11 @@ internal class DictationEngine(
     /**
      * Starts a capture session. Blocking only for thread creation; the
      * stream itself is created and started on the capture thread. Callable
-     * again after [stop] (fresh thread, fresh stream), never after [close].
-     * Call on the worker, after [load].
+     * again after [stop] (fresh thread, fresh stream). Call on the worker,
+     * after [load]. The capture-thread check is the one guard that matters:
+     * a double start would put two threads on native stream calls at once.
      */
     fun start() {
-        check(!closed) { "engine is closed" }
         check(captureThread == null) { "previous session not stopped" }
         running = true
         captureThread = Thread(this::captureLoop, "scribe-mic-capture").apply {
@@ -116,10 +109,12 @@ internal class DictationEngine(
         captureThread = null
     }
 
-    /** [stop] plus native teardown of the model. Terminal but idempotent. */
+    /**
+     * [stop] plus native teardown of the model. Terminal; callers drop
+     * their reference afterwards. Idempotent by construction — stop() is a
+     * no-op when idle and Transcriber.close() guards its own handle.
+     */
     fun close() {
-        if (closed) return
-        closed = true
         stop()
         transcriber.close()
     }
@@ -141,8 +136,7 @@ internal class DictationEngine(
                 bufferBytes,
             ).also { check(it.state == AudioRecord.STATE_INITIALIZED) }
         } catch (_: Throwable) {
-            post(onError)
-            running = false
+            main.post(onError)
             return
         }
 
@@ -164,16 +158,16 @@ internal class DictationEngine(
                 if (read <= 0) {
                     // A dead read is a capture failure, not a quiet exit —
                     // otherwise the service stays LISTENING with no audio.
-                    post(onError)
+                    main.post(onError)
                     break
                 }
                 val chunk = if (read == samples.size) samples else samples.copyOf(read)
                 val floats = FloatArray(read) { chunk[it] / 32768f }
-                post { onLevel(AudioLevels.magnitudeOf(AudioLevels.rms(chunk))) }
+                main.post { onLevel(AudioLevels.magnitudeOf(AudioLevels.rms(chunk))) }
                 transcriber.addAudioToStream(streamHandle, floats, SAMPLE_RATE)
             }
         } catch (_: Throwable) {
-            post(onError)
+            main.post(onError)
         } finally {
             try {
                 if (streamStarted) transcriber.stopStream(streamHandle)

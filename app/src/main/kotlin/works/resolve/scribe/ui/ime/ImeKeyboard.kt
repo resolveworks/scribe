@@ -22,7 +22,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -137,9 +136,9 @@ private fun MicControl(state: DictationState, level: Float, onClick: () -> Unit)
         label = "micHaloLevel",
     )
     val haloRadius = (40 + 56 * haloLevel).dp
-    Box(contentAlignment = Alignment.Center) {
+    Box {
         Canvas(modifier = Modifier.size(72.dp)) {
-            drawCircle(color = haloColor, radius = haloRadius.toPx(), style = Fill)
+            drawCircle(color = haloColor, radius = haloRadius.toPx())
         }
         FilledIconButton(
             onClick = onClick,
