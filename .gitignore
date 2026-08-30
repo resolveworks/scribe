@@ -22,6 +22,11 @@ build/
 # Local configuration file (sdk path, etc.)
 local.properties
 
+# Signing material — never commit keystores
+*.keystore
+*.jks
+
+
 # Android Studio / IntelliJ
 *.iml
 .idea/

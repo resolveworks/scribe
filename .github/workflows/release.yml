@@ -1,0 +1,39 @@
+name: release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Decode signing keystore
+        run: printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/scribe-release.keystore"
+
+      - name: Build release APK
+        env:
+          SCRIBE_KEYSTORE: ${{ runner.temp }}/scribe-release.keystore
+          SCRIBE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          SCRIBE_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          SCRIBE_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      - name: Upload APK to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk "scribe-${GITHUB_REF_NAME}.apk"
+          gh release upload "$GITHUB_REF_NAME" "scribe-${GITHUB_REF_NAME}.apk" --clobber
