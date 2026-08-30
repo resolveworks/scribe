@@ -2,26 +2,24 @@ package works.resolve.scribe.ui.ime
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import works.resolve.scribe.R
@@ -105,34 +103,36 @@ private fun KeyboardKey(
 
 /**
  * The keyboard is always listening while shown, so the mic is a status
- * indicator while transcribing (disabled — there is no stop), and a retry
- * or setup affordance otherwise.
+ * indicator while the engine works — faded while the model loads, white
+ * once actively listening, not clickable either way (there is no stop) —
+ * and a retry or setup affordance otherwise.
  */
 @Composable
 private fun MicControl(state: DictationState, onClick: () -> Unit) {
-    if (state == DictationState.LOADING) {
-        val loadingDescription = stringResource(R.string.ime_cd_loading)
-        Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .size(44.dp)
-                    .semantics { contentDescription = loadingDescription },
-            )
-        }
-        return
-    }
-
     val listening = state == DictationState.LISTENING
+    val loading = state == DictationState.LOADING
     val description = stringResource(
         when {
             listening -> R.string.ime_cd_mic_listening
+            loading -> R.string.ime_cd_loading
             state == DictationState.FAILED -> R.string.ime_cd_mic_retry
             else -> R.string.ime_cd_mic_start
         }
     )
     FilledIconButton(
         onClick = onClick,
-        enabled = !listening,
+        enabled = !listening && !loading,
+        // Disabled yet white while listening: the full tone marks the live
+        // mic, while fading stays reserved for the loading state.
+        colors =
+            if (listening) {
+                IconButtonDefaults.filledIconButtonColors(
+                    disabledContainerColor = MaterialTheme.colorScheme.primary,
+                    disabledContentColor = MaterialTheme.colorScheme.onPrimary,
+                )
+            } else {
+                IconButtonDefaults.filledIconButtonColors()
+            },
         modifier = Modifier.size(72.dp),
     ) {
         Icon(
