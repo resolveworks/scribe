@@ -52,10 +52,10 @@ private const val WORD_WINDOW_MAX_CHARS = 4096
  * that both the engine logic and the input view live by.
  *
  * Moonshine usage follows a single-native-access discipline: the blocking
- * [DictationEngine.load] / [DictationEngine.stop] /
+ * [DictationEngine.load] (idempotent) / [DictationEngine.stop] /
  * [DictationEngine.close] run on one serialized background executor, while
- * every stream call happens on the engine's own capture thread, which
- * stop()/close() join without timeout before any further native call —
+ * every stream call happens on the engine's single processing thread, which
+ * stop()/close() join without timeout after the capture thread —
  * making the upstream close-during-decode crash (#223) structurally
  * impossible. `onText` is treated as a changing partial (composing text),
  * `onLine` as a finished line (committed text), and the model stays loaded

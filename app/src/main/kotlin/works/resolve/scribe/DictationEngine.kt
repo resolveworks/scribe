@@ -1,16 +1,17 @@
 package works.resolve.scribe
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
-import android.annotation.SuppressLint
 import ai.moonshine.voice.Transcriber
 import ai.moonshine.voice.TranscriptEvent
 import ai.moonshine.voice.TranscriptLine
 import works.resolve.scribe.ime.AudioLevels
+import java.util.concurrent.ArrayBlockingQueue
 
 /**
  * Live microphone dictation on the base [Transcriber] — our own capture loop
@@ -18,24 +19,32 @@ import works.resolve.scribe.ime.AudioLevels
  * decode thread with a 1s timeout (upstream #223): a native decode that
  * outlasts the join frees the transcriber mid-decode and crashes.
  *
+ * It is also a producer/consumer split: a capture thread that only reads PCM
+ * and a processing thread that owns every Moonshine call. Reading the mic and
+ * transcribing it are serialized only through a queue, so a slow inference
+ * pass can never stall the mic (and its levels) — the queue absorbs the burst
+ * and inference batches it.
+ *
  * Thread model (the #223 fix — native calls are NEVER concurrent):
  *
- *  - `load()`, `stop()`, `close()` run on the caller's serialized worker;
- *    `load()` and `close()` (the model-level native calls) happen there.
- *  - Every stream call (`createStream`/`startStream`/`addAudioToStream`/
- *    `stopStream`/`freeStream`) happens ONLY on the single capture thread,
- *    which exists exactly while a session is running.
- *  - `stop()`/`close()` flip a volatile flag and `join()` the capture thread
- *    with NO timeout before any further native call, so the capture thread
- *    has finished its own `stopStream`/`freeStream` before `close()` can
- *    free the model. No bounded-join heuristic.
+ *  - `load()` and `close()` (the model-level native calls) run on the
+ *    caller's serialized worker. `load()` is idempotent: repeated keyboard
+ *    openings reuse the loaded model instead of leaking native copies.
+ *  - Every stream call — `start()`, `addAudio()`, `stop()` on the
+ *    Transcriber's default stream — happens ONLY on the single processing
+ *    thread of the current session.
+ *  - `stop()`/`close()` stop and join the capture thread first (so no more
+ *    audio arrives), then hand the end-of-stream marker through the queue and
+ *    join the processing thread with NO timeout, so its trailing
+ *    `Transcriber.stop()` (which flushes the final line) completes before
+ *    `close()` can free the model. No bounded-join heuristic.
  *
- * Blocking: `load()` reads the cached model (setup owns downloads),
- * `stop()` waits for one final ~100ms read plus flush, `close()` does `stop()`
- * plus the native teardown. Keep all of them off the main thread.
+ * Blocking: `load()` reads the cached model (setup owns downloads), `stop()`
+ * waits for one ~32ms read plus the drain/flush, `close()` does `stop()` plus
+ * the native teardown. Keep all of them off the main thread.
  *
  * All callbacks ([onText], [onLine], [onError], [onLevel]) are delivered on
- * the main thread; the transcriber emits events inline from the capture
+ * the main thread; the transcriber emits events inline from the processing
  * thread, so every dispatch is posted.
  */
 internal class DictationEngine(
@@ -61,18 +70,23 @@ internal class DictationEngine(
         }
     }
 
-    /** Cleared to end a session; read by the capture loop after every read. */
+    /** Cleared to end a session; read by both threads after each step. */
     @Volatile private var running = false
 
     /** Owned by the worker thread that runs start()/stop()/close(). */
-    private var captureThread: Thread? = null
+    private var sessionThreads: Pair<Thread, Thread>? = null
+
+    /** Queued audio between capture and processing; owned by the session. */
+    private var audioQueue: ArrayBlockingQueue<FloatArray>? = null
 
     /**
      * Loads the model from the cache directory (setup owns downloads; the
-     * service only starts dictation after checking presence). Blocking
-     * (file I/O, native); call on the worker. Throws on failure.
+     * service only starts dictation after checking presence). Idempotent: a
+     * no-op once loaded, so repeated keyboard openings reuse the model.
+     * Blocking (file I/O, native); call on the worker. Throws on failure.
      */
     fun load() {
+        if (transcriber.isLoaded) return
         try {
             val directory = MoonshineModel.directory(context)
             transcriber.loadFromFiles(directory.absolutePath, MoonshineModel.arch)
@@ -82,31 +96,45 @@ internal class DictationEngine(
     }
 
     /**
-     * Starts a capture session. Blocking only for thread creation; the
-     * stream itself is created and started on the capture thread. Callable
-     * again after [stop] (fresh thread, fresh stream). Call on the worker,
-     * after [load]. The capture-thread check is the one guard that matters:
-     * a double start would put two threads on native stream calls at once.
+     * Starts a session: a capture thread that owns only the AudioRecord, and
+     * a processing thread that owns every stream call on the default stream.
+     * Blocking only for thread creation. Callable again after [stop] (fresh
+     * threads, fresh stream). Call on the worker, after [load]. The session
+     * check is the one guard that matters: a double start would put two
+     * threads on native stream calls at once.
      */
     fun start() {
-        check(captureThread == null) { "previous session not stopped" }
+        check(sessionThreads == null) { "previous session not stopped" }
         running = true
-        captureThread = Thread(this::captureLoop, "scribe-mic-capture").apply {
+        val queue = ArrayBlockingQueue<FloatArray>(QUEUE_CHUNKS)
+        audioQueue = queue
+        val processing = Thread({ processingLoop(queue) }, "scribe-moonshine").apply {
             isDaemon = true
             start()
         }
+        val capture = Thread({ captureLoop(queue) }, "scribe-mic-capture").apply {
+            isDaemon = true
+            start()
+        }
+        sessionThreads = capture to processing
     }
 
     /**
-     * Ends the session. Blocking: joins the capture thread with no timeout —
-     * the loop self-terminates within one ~100ms read, and the capture
-     * thread's trailing `stopStream` (which flushes the final line) and
-     * `freeStream` complete before this returns. Safe no-op when idle.
+     * Ends the session. Blocking: joins the capture thread with no timeout
+     * (the loop self-terminates within one ~32ms read), then hands the
+     * end-of-stream marker through the queue and joins the processing thread
+     * with no timeout — its trailing `Transcriber.stop()` flushes the final
+     * line before this returns. Safe no-op when idle.
      */
     fun stop() {
+        val threads = sessionThreads ?: return
         running = false
-        captureThread?.join()
-        captureThread = null
+        val (capture, processing) = threads
+        capture.join()
+        audioQueue?.put(END_OF_STREAM)
+        processing.join()
+        audioQueue = null
+        sessionThreads = null
     }
 
     /**
@@ -121,10 +149,16 @@ internal class DictationEngine(
 
     // -- Capture -------------------------------------------------------------
 
+    /**
+     * The capture thread owns the AudioRecord and nothing else. It reads
+     * small (~32ms) chunks so [onLevel] stays live even while inference
+     * batches behind it, computes the level from the fresh PCM, and enqueues
+     * the chunk for the processing thread.
+     */
     // The service only starts dictation after RECORD_AUDIO is granted, and
     // any capture failure routes to onError instead of crashing.
     @SuppressLint("MissingPermission")
-    private fun captureLoop() {
+    private fun captureLoop(queue: ArrayBlockingQueue<FloatArray>) {
         val minBytes = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL, ENCODING)
         val bufferBytes = maxOf(minBytes, MIN_BUFFER_BYTES)
         val recorder = try {
@@ -140,18 +174,8 @@ internal class DictationEngine(
             return
         }
 
-        // Stream lifecycle lives entirely on this thread: created and
-        // started here, stopped (flushing the trailing final line) and freed
-        // in the finally below, before stop()'s join() can return.
-        // -1 = no stream yet, mirroring Transcriber's own defaultStreamHandle sentinel.
-        var streamHandle = -1
-        var streamStarted = false
         try {
             recorder.startRecording()
-            streamHandle = transcriber.createStream()
-            transcriber.startStream(streamHandle)
-            streamStarted = true
-
             val samples = ShortArray(READ_SAMPLES)
             while (running) {
                 val read = recorder.read(samples, 0, READ_SAMPLES)
@@ -162,20 +186,74 @@ internal class DictationEngine(
                     break
                 }
                 val chunk = if (read == samples.size) samples else samples.copyOf(read)
+                val level = AudioLevels.magnitudeOf(AudioLevels.rms(chunk))
                 val floats = FloatArray(read) { chunk[it] / 32768f }
-                main.post { onLevel(AudioLevels.magnitudeOf(AudioLevels.rms(chunk))) }
-                transcriber.addAudioToStream(streamHandle, floats, SAMPLE_RATE)
+                // Levels come from the fresh PCM, not the backlog, so the
+                // meter tracks the voice even when inference is batching.
+                main.post { onLevel(level) }
+                // Inference lag must never stall the mic: when the queue is
+                // full, drop the oldest audio (it is the stalest) instead of
+                // letting the capture thread block.
+                if (!queue.offer(floats)) {
+                    queue.poll()
+                    queue.offer(floats)
+                }
             }
         } catch (_: Throwable) {
             main.post(onError)
         } finally {
-            try {
-                if (streamStarted) transcriber.stopStream(streamHandle)
-                if (streamHandle >= 0) transcriber.freeStream(streamHandle)
-            } catch (_: Throwable) {
-                // A failure above may have torn things down already.
-            }
             recorder.release()
+        }
+    }
+
+    // -- Processing ----------------------------------------------------------
+
+    /**
+     * The processing thread owns every Moonshine stream call for the
+     * session. It drains queued chunks in batches (one `addAudio` per drain)
+     * and, on the end-of-stream marker, flushes the final line via
+     * `Transcriber.stop()` — all before stop()'s join() can return.
+     */
+    private fun processingLoop(queue: ArrayBlockingQueue<FloatArray>) {
+        var streamStarted = false
+        try {
+            transcriber.start()
+            streamStarted = true
+            val batch = ArrayList<FloatArray>()
+            drain@ while (true) {
+                batch.add(queue.take())
+                queue.drainTo(batch, QUEUE_CHUNKS)
+                var samples = 0
+                var endOfStream = false
+                for (c in batch) {
+                    if (c === END_OF_STREAM) endOfStream = true else samples += c.size
+                }
+                if (samples > 0) {
+                    val audio = FloatArray(samples)
+                    var offset = 0
+                    for (c in batch) {
+                        if (c === END_OF_STREAM) continue
+                        System.arraycopy(c, 0, audio, offset, c.size)
+                        offset += c.size
+                    }
+                    transcriber.addAudio(audio, SAMPLE_RATE)
+                }
+                batch.clear()
+                if (endOfStream) break@drain
+            }
+        } catch (_: Throwable) {
+            main.post(onError)
+        } finally {
+            if (streamStarted) {
+                // Flushes the trailing final line. If the loop above failed
+                // mid-stream this may itself fail; either way the stream is
+                // over and close()'s model teardown is still awaited by the
+                // join, so no native call races another.
+                try {
+                    transcriber.stop()
+                } catch (_: Throwable) {
+                }
+            }
         }
     }
 
@@ -183,7 +261,12 @@ internal class DictationEngine(
         const val SAMPLE_RATE = 16000
         const val CHANNEL = AudioFormat.CHANNEL_IN_MONO
         const val ENCODING = AudioFormat.ENCODING_PCM_16BIT
-        const val READ_SAMPLES = 1600 // ~100ms at 16kHz
-        const val MIN_BUFFER_BYTES = 3200
+        const val READ_SAMPLES = 512 // ~32ms at 16kHz
+        const val MIN_BUFFER_BYTES = 2048
+        /** ~5s of 32ms chunks — enough burst headroom before dropping audio. */
+        const val QUEUE_CHUNKS = 160
+
+        /** Marks the end of the stream; its empty size means "no audio". */
+        val END_OF_STREAM = FloatArray(0)
     }
 }
