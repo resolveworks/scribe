@@ -8,30 +8,38 @@ import android.content.Context
 import java.io.File
 
 /**
- * Shared view of the Moonshine speech-model cache.
- *
- * Setup uses it to check and download the model ahead of time; the IME uses it
- * to decide whether dictation is possible without paying for a blocking
- * [ai.moonshine.voice.MicTranscriber.load] first.
- *
- * The spec mirrors MicTranscriber's defaults (English, medium streaming arch,
- * no spelling model), so this resolves the exact directory MicTranscriber
- * downloads into and reads from — a model downloaded here is found by load().
+ * Shared view of the Moonshine speech-model cache — the single owner of
+ * the model spec used by the app. Nothing else picks an arch or language:
+ * setup downloads via [download], the IME checks [isDownloaded], and
+ * [DictationEngine.load] loads from [ensureDownloaded].
  */
 object MoonshineModel {
 
+    /** The model architecture [DictationEngine] loads via loadFromFiles. */
+    val arch: Int = JNI.MOONSHINE_MODEL_ARCH_MEDIUM_STREAMING
+
     private fun spec(): ModelSpec =
-        ModelSpec.stt("en", JNI.MOONSHINE_MODEL_ARCH_MEDIUM_STREAMING, false)
+        ModelSpec.stt("en", arch, false)
 
     private fun directory(context: Context): File =
         ModelCache.directoryFor(context, spec(), null)
 
     /**
-     * True when every model file MicTranscriber needs is already cached.
+     * True when every model file [DictationEngine] needs is already cached.
      * Blocking (JNI catalog + file I/O); keep off the main thread.
      */
     fun isDownloaded(context: Context): Boolean =
         AssetDownloader().isModelPresent(directory(context), spec())
+
+    /**
+     * Ensures the model is cached and returns its directory, ready for
+     * `loadFromFiles`. Blocking (network + file I/O); throws on failure.
+     */
+    fun ensureDownloaded(context: Context): File {
+        val dir = directory(context)
+        AssetDownloader().ensureModelPresent(dir, spec()) { _, _, _, _, _ -> }
+        return dir
+    }
 
     /**
      * Downloads any missing model files into the cache. Blocking network I/O;

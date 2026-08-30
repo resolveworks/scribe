@@ -38,7 +38,7 @@ internal enum class DictationState { IDLE, LOADING, LISTENING, FAILED }
 @Composable
 internal fun ImeKeyboard(
     state: DictationState,
-    level: Float = 0f,
+    level: Float,
     onBack: () -> Unit,
     onDelete: () -> Unit,
     onMicClick: () -> Unit,
