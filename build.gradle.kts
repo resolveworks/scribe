@@ -8,4 +8,15 @@
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.spotless)
+}
+
+// Formatting lives at the root so there is one spotlessCheck/spotlessApply
+// for every module. ktlint reads .editorconfig (android_studio code style).
+spotless {
+    kotlin {
+        target("**/*.kt", "**/*.kts")
+        targetExclude("**/build/**")
+        ktlint(libs.versions.ktlint.get())
+    }
 }

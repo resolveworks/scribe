@@ -1,0 +1,9 @@
+root = true
+
+[*.{kt,kts}]
+ktlint_code_style = android_studio
+# Compose composable functions are PascalCase by convention.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+# Long backticked names (descriptive unit-test names) are exempt from the
+# line-length limit rather than being @Suppress'd per test.
+ktlint_ignore_back_ticked_identifier = true

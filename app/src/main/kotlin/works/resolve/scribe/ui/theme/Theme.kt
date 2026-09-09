@@ -8,15 +8,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 @Composable
-fun ScribeTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit,
-) {
+fun ScribeTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val context = LocalContext.current
-    val colorScheme = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    val colorScheme = if (darkTheme) {
+        dynamicDarkColorScheme(
+            context
+        )
+    } else {
+        dynamicLightColorScheme(context)
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,
-        content = content,
+        content = content
     )
 }

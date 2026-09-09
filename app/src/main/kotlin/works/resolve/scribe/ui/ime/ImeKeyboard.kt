@@ -39,7 +39,7 @@ internal fun ImeKeyboard(
     onDelete: () -> Unit,
     onMicClick: () -> Unit,
     onEnter: () -> Unit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     Surface(modifier = modifier.fillMaxWidth()) {
         // Wrap-content layout: the IME window sizes itself to this view's
@@ -53,12 +53,12 @@ internal fun ImeKeyboard(
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(bottom = 48.dp) // mirror the back key's height below the keys
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 16.dp)
         ) {
             IconButton(onClick = onBack) {
                 Icon(
                     painter = painterResource(R.drawable.arrow_back_24),
-                    contentDescription = stringResource(R.string.ime_cd_back),
+                    contentDescription = stringResource(R.string.ime_cd_back)
                 )
             }
             // The delete–mic–enter cluster is centered as one group, with
@@ -69,18 +69,18 @@ internal fun ImeKeyboard(
                     .fillMaxWidth()
                     .padding(vertical = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(48.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 KeyboardKey(
                     iconRes = R.drawable.backspace_24,
                     description = stringResource(R.string.ime_cd_delete),
-                    onClick = onDelete,
+                    onClick = onDelete
                 )
                 MicControl(state, level, onMicClick)
                 KeyboardKey(
                     iconRes = R.drawable.keyboard_return_24,
                     description = stringResource(R.string.ime_cd_enter),
-                    onClick = onEnter,
+                    onClick = onEnter
                 )
             }
         }
@@ -88,18 +88,14 @@ internal fun ImeKeyboard(
 }
 
 @Composable
-private fun KeyboardKey(
-    @DrawableRes iconRes: Int,
-    description: String,
-    onClick: () -> Unit,
-) {
+private fun KeyboardKey(@DrawableRes iconRes: Int, description: String, onClick: () -> Unit) {
     FilledTonalIconButton(
         onClick = onClick,
-        modifier = Modifier.size(56.dp),
+        modifier = Modifier.size(56.dp)
     ) {
         Icon(
             painter = painterResource(iconRes),
-            contentDescription = description,
+            contentDescription = description
         )
     }
 }
@@ -142,19 +138,25 @@ private fun MicControl(state: DictationState, level: Float, onClick: () -> Unit)
                 if (listening) {
                     IconButtonDefaults.filledIconButtonColors(
                         disabledContainerColor = MaterialTheme.colorScheme.primary,
-                        disabledContentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
                     IconButtonDefaults.filledIconButtonColors()
                 },
-            modifier = Modifier.size(72.dp),
+            modifier = Modifier.size(72.dp)
         ) {
             Icon(
                 painter = painterResource(
-                    if (state == DictationState.FAILED) R.drawable.mic_alert_24 else R.drawable.mic_24
+                    if (state ==
+                        DictationState.FAILED
+                    ) {
+                        R.drawable.mic_alert_24
+                    } else {
+                        R.drawable.mic_24
+                    }
                 ),
                 contentDescription = description,
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(32.dp)
             )
         }
     }
@@ -170,7 +172,7 @@ private fun ImeKeyboardPreview() {
             onBack = {},
             onDelete = {},
             onMicClick = {},
-            onEnter = {},
+            onEnter = {}
         )
     }
 }

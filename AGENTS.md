@@ -40,7 +40,7 @@ transcript history, cloud services.
 ## Commands
 
 ```bash
-./gradlew test assembleDebug lintDebug
+./gradlew spotlessCheck test assembleDebug lintDebug
 ```
 
 Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.

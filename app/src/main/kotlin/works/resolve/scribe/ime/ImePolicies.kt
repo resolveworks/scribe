@@ -27,10 +27,7 @@ object TextJoining {
  * counts the separator that was prepended too, so one delete removes
  * exactly what one commit inserted.
  */
-data class CommittedLine(
-    val textLength: Int,
-    val separatorLength: Int,
-) {
+data class CommittedLine(val textLength: Int, val separatorLength: Int) {
     val deleteLength: Int get() = textLength + separatorLength
 }
 
@@ -51,8 +48,16 @@ object WordDeletion {
         // word takes the whitespace before it, trailing whitespace takes
         // its word. One press, one word.
         val touchingWhitespace = textBeforeCursor[start - 1].isWhitespace()
-        while (start > 0 && textBeforeCursor[start - 1].isWhitespace() == touchingWhitespace) start--
-        while (start > 0 && textBeforeCursor[start - 1].isWhitespace() != touchingWhitespace) start--
+        while (start > 0 &&
+            textBeforeCursor[start - 1].isWhitespace() == touchingWhitespace
+        ) {
+            start--
+        }
+        while (start > 0 &&
+            textBeforeCursor[start - 1].isWhitespace() != touchingWhitespace
+        ) {
+            start--
+        }
         // A fetch window that begins mid-surrogate pair must not split it.
         if (start == 0 && textBeforeCursor[0].isLowSurrogate()) start = 1
         return textBeforeCursor.length - start
@@ -88,7 +93,7 @@ object Backspace {
         hasSelection: Boolean,
         lastCommitted: CommittedLine?,
         cursorVerified: Boolean,
-        textBeforeCursor: CharSequence?,
+        textBeforeCursor: CharSequence?
     ): Decision = when {
         partialActive -> Decision.DiscardPartial
         hasSelection -> Decision.DeleteSelection
@@ -124,8 +129,9 @@ object EditorActions {
         val action = imeOptions and EditorInfo.IME_MASK_ACTION
         return when (action) {
             EditorInfo.IME_ACTION_NONE,
-            EditorInfo.IME_ACTION_UNSPECIFIED,
+            EditorInfo.IME_ACTION_UNSPECIFIED
             -> Decision.SendEnterKey
+
             else -> Decision.Perform(action)
         }
     }

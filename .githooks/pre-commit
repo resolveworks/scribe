@@ -1,0 +1,6 @@
+#!/bin/sh
+# Enabled with: git config core.hooksPath .githooks  (see README.md)
+./gradlew --quiet spotlessCheck || {
+    echo "Formatting check failed. Run './gradlew spotlessApply', review, and re-stage." >&2
+    exit 1
+}

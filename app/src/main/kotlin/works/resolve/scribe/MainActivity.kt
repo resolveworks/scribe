@@ -14,11 +14,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import works.resolve.scribe.ui.setup.ModelState
 import works.resolve.scribe.ui.setup.SetupScreen
 import works.resolve.scribe.ui.theme.ScribeTheme
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
 
@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
                     downloadProgress = downloadProgress,
                     onOpenImeSettings = ::openImeSettings,
                     onRequestMicPermission = ::requestMicPermission,
-                    onDownloadModel = ::downloadModel,
+                    onDownloadModel = ::downloadModel
                 )
             }
         }
@@ -111,15 +111,14 @@ class MainActivity : ComponentActivity() {
      * have asked before, the user has not granted, and the platform will no
      * longer show a rationale-capable dialog.
      */
-    private fun micPermissionDialogSuppressed(): Boolean =
-        askedMicBefore &&
-            !shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)
+    private fun micPermissionDialogSuppressed(): Boolean = askedMicBefore &&
+        !shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)
 
     private fun openAppPermissionSettings() {
         startActivity(
             Intent(
                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.fromParts("package", packageName, null),
+                Uri.fromParts("package", packageName, null)
             )
         )
     }

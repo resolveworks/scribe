@@ -12,13 +12,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -31,7 +31,8 @@ import works.resolve.scribe.ui.theme.ScribeTheme
 /** Setup state of the speech-model download, driven by [MainActivity]. */
 enum class ModelState { NOT_DOWNLOADED, DOWNLOADING, DOWNLOADED, FAILED }
 
-@OptIn(ExperimentalMaterial3Api::class) // TopAppBar is @ExperimentalMaterial3Api in stable 1.4.0; stable from 1.5.0-alpha23.
+// TopAppBar is @ExperimentalMaterial3Api in stable 1.4.0; stable from 1.5.0-alpha23.
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SetupScreen(
     imeEnabled: Boolean,
@@ -41,7 +42,7 @@ fun SetupScreen(
     onOpenImeSettings: () -> Unit,
     onRequestMicPermission: () -> Unit,
     onDownloadModel: () -> Unit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -50,11 +51,11 @@ fun SetupScreen(
                 title = {
                     Text(
                         text = stringResource(R.string.setup_title),
-                        maxLines = 1,
+                        maxLines = 1
                     )
-                },
+                }
             )
-        },
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -65,33 +66,37 @@ fun SetupScreen(
                 // Stay usable on short/landscape displays.
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 text = stringResource(R.string.setup_body),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
 
             SetupStep(
                 headline = stringResource(R.string.setup_enable_ime),
                 status = stringResource(
                     R.string.setup_ime_status,
-                    stringResource(if (imeEnabled) R.string.setup_status_yes else R.string.setup_status_no),
+                    stringResource(
+                        if (imeEnabled) R.string.setup_status_yes else R.string.setup_status_no
+                    )
                 ),
                 iconRes = R.drawable.keyboard_24,
-                done = imeEnabled,
+                done = imeEnabled
             )
 
             SetupStep(
                 headline = stringResource(R.string.setup_grant_mic),
                 status = stringResource(
                     R.string.setup_permission_status,
-                    stringResource(if (micGranted) R.string.setup_status_yes else R.string.setup_status_no),
+                    stringResource(
+                        if (micGranted) R.string.setup_status_yes else R.string.setup_status_no
+                    )
                 ),
                 iconRes = R.drawable.mic_24,
-                done = micGranted,
+                done = micGranted
             )
 
             SetupStep(
@@ -99,17 +104,20 @@ fun SetupScreen(
                 status = when (modelState) {
                     ModelState.DOWNLOADED -> stringResource(
                         R.string.setup_model_status,
-                        stringResource(R.string.setup_status_yes),
+                        stringResource(R.string.setup_status_yes)
                     )
+
                     ModelState.DOWNLOADING -> stringResource(R.string.setup_model_downloading)
+
                     ModelState.FAILED -> stringResource(R.string.setup_download_failed)
+
                     ModelState.NOT_DOWNLOADED -> stringResource(
                         R.string.setup_model_status,
-                        stringResource(R.string.setup_status_no),
+                        stringResource(R.string.setup_status_no)
                     )
                 },
                 iconRes = R.drawable.download_24,
-                done = modelState == ModelState.DOWNLOADED,
+                done = modelState == ModelState.DOWNLOADED
             )
 
             Spacer(Modifier.height(8.dp))
@@ -119,7 +127,7 @@ fun SetupScreen(
                     onClick = onOpenImeSettings,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 16.dp)
                 ) {
                     Text(stringResource(R.string.setup_enable_ime))
                 }
@@ -129,7 +137,7 @@ fun SetupScreen(
                     onClick = onRequestMicPermission,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 16.dp)
                 ) {
                     Text(stringResource(R.string.setup_grant_mic))
                 }
@@ -141,13 +149,13 @@ fun SetupScreen(
                         progress = { progress },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = 16.dp)
                     )
                 } else {
                     LinearProgressIndicator(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = 16.dp)
                     )
                 }
             } else if (modelState != ModelState.DOWNLOADED) {
@@ -155,7 +163,7 @@ fun SetupScreen(
                     onClick = onDownloadModel,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 16.dp)
                 ) {
                     Text(stringResource(R.string.setup_download_model))
                 }
@@ -165,12 +173,7 @@ fun SetupScreen(
 }
 
 @Composable
-private fun SetupStep(
-    headline: String,
-    status: String,
-    @DrawableRes iconRes: Int,
-    done: Boolean,
-) {
+private fun SetupStep(headline: String, status: String, @DrawableRes iconRes: Int, done: Boolean) {
     ListItem(
         headlineContent = { Text(headline) },
         supportingContent = { Text(status) },
@@ -179,7 +182,7 @@ private fun SetupStep(
                 painter = painterResource(iconRes),
                 // Decorative: the row text carries the meaning.
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         },
         trailingContent = if (done) {
@@ -188,12 +191,12 @@ private fun SetupStep(
                     painter = painterResource(R.drawable.check_24),
                     // Status is already stated by the supporting text.
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         } else {
             null
-        },
+        }
     )
 }
 
@@ -208,7 +211,7 @@ private fun SetupScreenPreview() {
             downloadProgress = null,
             onOpenImeSettings = {},
             onRequestMicPermission = {},
-            onDownloadModel = {},
+            onDownloadModel = {}
         )
     }
 }
@@ -224,7 +227,7 @@ private fun SetupScreenDownloadingPreview() {
             downloadProgress = 0.4f,
             onOpenImeSettings = {},
             onRequestMicPermission = {},
-            onDownloadModel = {},
+            onDownloadModel = {}
         )
     }
 }
@@ -240,7 +243,7 @@ private fun SetupScreenAllSetPreview() {
             downloadProgress = null,
             onOpenImeSettings = {},
             onRequestMicPermission = {},
-            onDownloadModel = {},
+            onDownloadModel = {}
         )
     }
 }

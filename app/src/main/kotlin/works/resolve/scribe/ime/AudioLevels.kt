@@ -39,6 +39,5 @@ internal object AudioLevels {
      * Perceptual loudness mapping `1 - 0.1^(24 * rms)`, coerced into
      * 0f..1f so negative or NaN input cannot escape the range.
      */
-    internal fun magnitudeOf(rms: Float): Float =
-        (1f - 0.1f.pow(24f * rms)).coerceIn(0f, 1f)
+    internal fun magnitudeOf(rms: Float): Float = (1f - 0.1f.pow(24f * rms)).coerceIn(0f, 1f)
 }

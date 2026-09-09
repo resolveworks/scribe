@@ -44,7 +44,7 @@ permission is used only for the model download.
 Requires JDK 17 and the Android API 37 SDK.
 
 ```bash
-./gradlew test assembleDebug lintDebug
+./gradlew spotlessCheck test assembleDebug lintDebug
 ```
 
 The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.

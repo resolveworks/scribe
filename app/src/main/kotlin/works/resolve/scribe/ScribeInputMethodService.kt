@@ -1,5 +1,6 @@
 package works.resolve.scribe
 
+import ai.moonshine.voice.TranscriptLine
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -13,7 +14,6 @@ import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
-import ai.moonshine.voice.TranscriptLine
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -26,6 +26,8 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import works.resolve.scribe.ime.Backspace
 import works.resolve.scribe.ime.CommittedLine
 import works.resolve.scribe.ime.EditorActions
@@ -33,8 +35,6 @@ import works.resolve.scribe.ime.TextJoining
 import works.resolve.scribe.ui.ime.DictationState
 import works.resolve.scribe.ui.ime.ImeKeyboard
 import works.resolve.scribe.ui.theme.ScribeTheme
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 /** How much text before the cursor to inspect for word deletion at once. */
 private const val WORD_WINDOW_CHARS = 256
@@ -61,7 +61,10 @@ private const val WORD_WINDOW_MAX_CHARS = 4096
  * `onLine` as a finished line (committed text), and the model stays loaded
  * and reusable while the service lives.
  */
-class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateRegistryOwner {
+class ScribeInputMethodService :
+    InputMethodService(),
+    LifecycleOwner,
+    SavedStateRegistryOwner {
 
     private val main = Handler(Looper.getMainLooper())
     private lateinit var worker: ExecutorService
@@ -129,7 +132,7 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
             onText = ::onPartialText,
             onLine = ::onFinalLine,
             onError = ::onEngineError,
-            onLevel = ::onMicLevel,
+            onLevel = ::onMicLevel
         )
     }
 
@@ -170,7 +173,7 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
                         onBack = ::switchToPreviousInputMethod,
                         onDelete = ::deleteBackwards,
                         onMicClick = ::onMicClicked,
-                        onEnter = ::performEnter,
+                        onEnter = ::performEnter
                     )
                 }
             }
@@ -193,7 +196,9 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
         when {
             // The model may have been downloaded in setup since the last look.
             modelPresent != true -> checkModelPresence()
+
             !micPermissionGranted() -> handlePrerequisitesMissing()
+
             else -> syncDictation()
         }
     }
@@ -201,10 +206,11 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
     override fun onFinishInputView(finishingInput: Boolean) {
         stopDictation()
         super.onFinishInputView(finishingInput)
-        // isAuxiliary keeps this voice subtype out of IME history, but does
-        // not restore the previous keyboard by itself. Return while this
-        // service's IME token is still valid, before the window is hidden.
-        switchToPreviousInputMethod()
+        // Deliberately no switch-back to the previous keyboard here: this
+        // callback also fires when the system aborts a show mid-transition
+        // (racing keyboard switches), and switching from there bounces the
+        // user away instead of letting the system retry showing this IME.
+        // The back button owns the return.
     }
 
     override fun onWindowShown() {
@@ -221,8 +227,7 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
     // -- Prerequisites --------------------------------------------------------
 
     /** Both facts dictation needs: the model cached and the mic permitted. */
-    private fun prerequisitesMet(): Boolean =
-        modelPresent == true && micPermissionGranted()
+    private fun prerequisitesMet(): Boolean = modelPresent == true && micPermissionGranted()
 
     /** The IME never requests the permission itself — setup owns requests, so the SDK dialog can't pop over the host app. */
     private fun micPermissionGranted(): Boolean =
@@ -387,7 +392,11 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
 
     private fun onEngineError() {
         if (destroyed) return
-        if (dictationState != DictationState.LISTENING && dictationState != DictationState.LOADING) return
+        if (dictationState != DictationState.LISTENING &&
+            dictationState != DictationState.LOADING
+        ) {
+            return
+        }
         micLevel = 0f
         dictationState = DictationState.FAILED
         // Clear the failed session before a queued mic-button retry starts.
@@ -411,7 +420,7 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
             hasSelection = !ic.getSelectedText(0).isNullOrEmpty(),
             lastCommitted = committedLines.lastOrNull(),
             cursorVerified = expectedCursor != null && cursorPosition(ic) == expectedCursor,
-            textBeforeCursor = textBeforeCursor(ic),
+            textBeforeCursor = textBeforeCursor(ic)
         )
         when (decision) {
             Backspace.Decision.DiscardPartial -> {
@@ -420,12 +429,14 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
                 ic.commitText("", 1)
                 partialActive = false
             }
+
             Backspace.Decision.DeleteSelection -> {
                 // commitText("") is the documented way to delete selected text.
                 ic.commitText("", 1)
                 // The selection removed text our ledger still claims.
                 forgetLedger()
             }
+
             is Backspace.Decision.RevertLine -> {
                 ic.beginBatchEdit()
                 // Armor only: a live partial took the branch above, so there
@@ -438,6 +449,7 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
                 committedLines.removeLast()
                 expectedCursor = expectedCursor?.minus(decision.length)
             }
+
             is Backspace.Decision.DeleteWord -> {
                 // Nothing of ours is left — or the ledger no longer matches
                 // the field — so backspace keeps going through the text that
@@ -494,9 +506,14 @@ class ScribeInputMethodService : InputMethodService(), LifecycleOwner, SavedStat
         // lengths and cursor position no longer describe the field.
         forgetLedger()
         val info = currentInputEditorInfo
-        val decision = EditorActions.decide(info?.actionId ?: 0, info?.actionLabel, info?.imeOptions ?: 0)
+        val decision = EditorActions.decide(
+            info?.actionId ?: 0,
+            info?.actionLabel,
+            info?.imeOptions ?: 0
+        )
         when (decision) {
             is EditorActions.Decision.Perform -> ic.performEditorAction(decision.actionId)
+
             EditorActions.Decision.SendEnterKey -> {
                 ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
                 ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))

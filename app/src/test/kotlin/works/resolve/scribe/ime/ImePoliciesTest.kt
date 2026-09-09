@@ -1,9 +1,9 @@
 package works.resolve.scribe.ime
 
 import android.view.inputmethod.EditorInfo
-import works.resolve.scribe.ime.EditorActions.Decision
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import works.resolve.scribe.ime.EditorActions.Decision
 
 class TextJoiningTest {
 
@@ -96,7 +96,7 @@ class BackspaceTest {
             hasSelection = true,
             lastCommitted = line,
             cursorVerified = true,
-            textBeforeCursor = "anything",
+            textBeforeCursor = "anything"
         )
         assertEquals(Backspace.Decision.DiscardPartial, decision)
     }
@@ -108,7 +108,7 @@ class BackspaceTest {
             hasSelection = true,
             lastCommitted = line,
             cursorVerified = true,
-            textBeforeCursor = "anything",
+            textBeforeCursor = "anything"
         )
         assertEquals(Backspace.Decision.DeleteSelection, decision)
     }
@@ -120,7 +120,7 @@ class BackspaceTest {
             hasSelection = false,
             lastCommitted = line,
             cursorVerified = true,
-            textBeforeCursor = "anything",
+            textBeforeCursor = "anything"
         )
         assertEquals(Backspace.Decision.RevertLine(line.deleteLength), decision)
     }
@@ -132,7 +132,7 @@ class BackspaceTest {
             hasSelection = false,
             lastCommitted = line,
             cursorVerified = false,
-            textBeforeCursor = "prior text ",
+            textBeforeCursor = "prior text "
         )
         assertEquals(Backspace.Decision.DeleteWord(5), decision)
     }
@@ -144,7 +144,7 @@ class BackspaceTest {
             hasSelection = false,
             lastCommitted = null,
             cursorVerified = true,
-            textBeforeCursor = "word",
+            textBeforeCursor = "word"
         )
         assertEquals(Backspace.Decision.DeleteWord(4), decision)
     }
@@ -156,7 +156,7 @@ class BackspaceTest {
             hasSelection = false,
             lastCommitted = null,
             cursorVerified = false,
-            textBeforeCursor = "",
+            textBeforeCursor = ""
         )
         assertEquals(Backspace.Decision.DeleteWord(0), decision)
     }
@@ -174,11 +174,11 @@ class EditorActionsTest {
     fun searchAndDoneArePerformed() {
         assertEquals(
             Decision.Perform(EditorInfo.IME_ACTION_SEARCH),
-            EditorActions.decide(EditorInfo.IME_ACTION_SEARCH),
+            EditorActions.decide(EditorInfo.IME_ACTION_SEARCH)
         )
         assertEquals(
             Decision.Perform(EditorInfo.IME_ACTION_DONE),
-            EditorActions.decide(EditorInfo.IME_ACTION_DONE),
+            EditorActions.decide(EditorInfo.IME_ACTION_DONE)
         )
     }
 
@@ -206,7 +206,11 @@ class EditorActionsTest {
 
     @Test
     fun customActionLabelAndIdWinOverImeOptions() {
-        val decision = EditorActions.decide(actionId = 42, actionLabel = "Go!", imeOptions = EditorInfo.IME_ACTION_DONE)
+        val decision = EditorActions.decide(
+            actionId = 42,
+            actionLabel = "Go!",
+            imeOptions = EditorInfo.IME_ACTION_DONE
+        )
         assertEquals(Decision.Perform(42), decision)
     }
 
@@ -215,20 +219,28 @@ class EditorActionsTest {
         val decision = EditorActions.decide(
             actionId = EditorInfo.IME_ACTION_NONE,
             actionLabel = "Go!",
-            imeOptions = EditorInfo.IME_ACTION_DONE,
+            imeOptions = EditorInfo.IME_ACTION_DONE
         )
         assertEquals(Decision.Perform(EditorInfo.IME_ACTION_DONE), decision)
     }
 
     @Test
     fun customActionIdWithoutLabelFallsBackToImeOptions() {
-        val decision = EditorActions.decide(actionId = 42, actionLabel = null, imeOptions = EditorInfo.IME_ACTION_DONE)
+        val decision = EditorActions.decide(
+            actionId = 42,
+            actionLabel = null,
+            imeOptions = EditorInfo.IME_ACTION_DONE
+        )
         assertEquals(Decision.Perform(EditorInfo.IME_ACTION_DONE), decision)
     }
 
     @Test
     fun customActionWithEmptyLabelFallsBackToImeOptions() {
-        val decision = EditorActions.decide(actionId = 42, actionLabel = "", imeOptions = EditorInfo.IME_ACTION_SEND)
+        val decision = EditorActions.decide(
+            actionId = 42,
+            actionLabel = "",
+            imeOptions = EditorInfo.IME_ACTION_SEND
+        )
         assertEquals(Decision.Perform(EditorInfo.IME_ACTION_SEND), decision)
     }
 }

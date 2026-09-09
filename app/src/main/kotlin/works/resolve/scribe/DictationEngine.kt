@@ -1,5 +1,8 @@
 package works.resolve.scribe
 
+import ai.moonshine.voice.Transcriber
+import ai.moonshine.voice.TranscriptEvent
+import ai.moonshine.voice.TranscriptLine
 import android.annotation.SuppressLint
 import android.content.Context
 import android.media.AudioFormat
@@ -7,11 +10,8 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
-import ai.moonshine.voice.Transcriber
-import ai.moonshine.voice.TranscriptEvent
-import ai.moonshine.voice.TranscriptLine
-import works.resolve.scribe.ime.AudioLevels
 import java.util.concurrent.LinkedBlockingQueue
+import works.resolve.scribe.ime.AudioLevels
 
 /**
  * Live microphone dictation on the base [Transcriber] — our own capture loop
@@ -48,10 +48,13 @@ import java.util.concurrent.LinkedBlockingQueue
  */
 internal class DictationEngine(
     private val context: Context,
-    private val onText: (String) -> Unit,          // changing partial
-    private val onLine: (TranscriptLine) -> Unit,  // finished line
+    // changing partial
+    private val onText: (String) -> Unit,
+    // finished line
+    private val onLine: (TranscriptLine) -> Unit,
     private val onError: () -> Unit,
-    private val onLevel: (Float) -> Unit,          // 0..1 live loudness
+    // 0..1 live loudness
+    private val onLevel: (Float) -> Unit
 ) {
     private val main = Handler(Looper.getMainLooper())
 
@@ -60,8 +63,10 @@ internal class DictationEngine(
             when (event) {
                 is TranscriptEvent.LineTextChanged ->
                     main.post { onText(event.line.text.orEmpty()) }
+
                 is TranscriptEvent.LineCompleted ->
                     main.post { onLine(event.line) }
+
                 else -> Unit
             }
         }
@@ -158,7 +163,7 @@ internal class DictationEngine(
                 SAMPLE_RATE,
                 CHANNEL,
                 ENCODING,
-                bufferBytes,
+                bufferBytes
             ).also { check(it.state == AudioRecord.STATE_INITIALIZED) }
 
             recorder.startRecording()
